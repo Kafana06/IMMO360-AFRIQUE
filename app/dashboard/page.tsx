@@ -396,6 +396,11 @@ export default function DashboardPage() {
         setShowRoleSwitcher(true);
         showToast("Accès Propriétaire SaaS activé via clé secrète !");
       }
+      if (params.get('signup') === 'true') {
+        setAuthMode('signup');
+      } else if (params.get('login') === 'true') {
+        setAuthMode('login');
+      }
     }
 
     // Keyboard shortcut listener (Ctrl + Shift + P)
@@ -915,16 +920,14 @@ export default function DashboardPage() {
                   </div>
                 </form>
 
-                {mockSupabase.getAgencies().length > 0 && (
-                  <div className="text-center mt-6">
-                    <button 
-                      onClick={() => setAuthMode('login')}
-                      className="text-xs text-slate-450 hover:text-slate-350 transition-colors underline underline-offset-4 cursor-pointer"
-                    >
-                      Déjà inscrit ? Se connecter
-                    </button>
-                  </div>
-                )}
+                <div className="text-center mt-6">
+                  <button 
+                    onClick={() => setAuthMode('login')}
+                    className="text-xs text-slate-450 hover:text-slate-350 transition-colors underline underline-offset-4 cursor-pointer"
+                  >
+                    Déjà inscrit ? Se connecter
+                  </button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

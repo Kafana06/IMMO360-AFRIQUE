@@ -136,7 +136,7 @@ export default function LandingPage() {
               Démo Agence
             </Link>
             <Link 
-              href="/dashboard" 
+              href="/dashboard?signup=true" 
               className="relative group overflow-hidden px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-950 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 shadow-lg shadow-amber-500/10 transition-all duration-300"
             >
               <span className="flex items-center gap-1.5">
@@ -167,7 +167,7 @@ export default function LandingPage() {
 
         <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link 
-            href="/dashboard" 
+            href="/dashboard?signup=true" 
             className="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-bold text-slate-950 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 shadow-xl shadow-amber-500/20 transition-all duration-300 flex items-center justify-center gap-2 group"
           >
             Commencer maintenant
@@ -835,7 +835,7 @@ export default function LandingPage() {
                 </ul>
               </div>
               <Link 
-                href="/dashboard"
+                href="/dashboard?signup=true"
                 className="mt-8 w-full py-3 rounded-xl border border-slate-800 hover:bg-slate-900 transition-colors text-center text-xs font-bold text-white block"
               >
                 Choisir ce plan
@@ -878,7 +878,7 @@ export default function LandingPage() {
                 </ul>
               </div>
               <Link 
-                href="/dashboard"
+                href="/dashboard?signup=true"
                 className="mt-8 w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition-all text-center text-xs block shadow-lg shadow-amber-500/10"
               >
                 Commencer l'essai gratuit
@@ -918,7 +918,7 @@ export default function LandingPage() {
                 </ul>
               </div>
               <Link 
-                href="/dashboard"
+                href="/dashboard?signup=true"
                 className="mt-8 w-full py-3 rounded-xl border border-slate-800 hover:bg-slate-900 transition-colors text-center text-xs font-bold text-white block"
               >
                 Choisir ce plan
