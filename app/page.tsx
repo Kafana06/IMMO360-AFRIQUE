@@ -27,7 +27,7 @@ import Link from 'next/link';
 export default function LandingPage() {
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
   const [currency, setCurrency] = useState<'FCFA' | 'EUR'>('FCFA');
-  const [activeTab, setActiveTab] = useState<'payments' | 'leases' | 'crm' | 'social'>('payments');
+  const [activeTab, setActiveTab] = useState<'payments' | 'leases' | 'crm' | 'sales' | 'social'>('payments');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   // Simulation de paiement interactive sur la landing page
@@ -471,10 +471,11 @@ export default function LandingPage() {
           </div>
 
           {/* Navigation des onglets */}
-          <div className="flex flex-wrap justify-center gap-2 p-1.5 bg-slate-900 rounded-2xl max-w-2xl mx-auto mb-12">
+          <div className="flex flex-wrap justify-center gap-2 p-1.5 bg-slate-900 rounded-2xl max-w-3xl mx-auto mb-12">
             {[
               { id: 'payments', label: 'Paiements Mobile', icon: Smartphone },
               { id: 'leases', label: 'Baux OHADA', icon: FileText },
+              { id: 'sales', label: 'Ventes & Cessions', icon: TrendingUp },
               { id: 'crm', label: 'CRM & Prospects', icon: Users },
               { id: 'social', label: 'Logements Sociaux', icon: Layers }
             ].map(tab => (
@@ -586,6 +587,64 @@ export default function LandingPage() {
                       <div className="p-3 bg-slate-900 rounded-lg border border-slate-850 text-xs flex justify-between items-center">
                         <span className="text-slate-400">Signature :</span>
                         <span className="font-semibold text-emerald-400">Signé numériquement</span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'sales' && (
+                <motion.div 
+                  key="sales"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="grid md:grid-cols-2 gap-12 items-center"
+                >
+                  <div className="space-y-6">
+                    <h3 className="text-2xl font-bold text-white">Ventes, Cessions &amp; Commissions (10%)</h3>
+                    <p className="text-sm text-slate-400 leading-relaxed">
+                      Publiez des maisons et des terrains à vendre. Notre plateforme intègre un module de checkout transparent prélevant automatiquement une commission de 10% sur chaque transaction.
+                    </p>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 text-xs text-slate-300">
+                        <CheckCircle2 className="w-4 h-4 text-amber-500" />
+                        <span>Visualisation de la répartition 90/10 en temps réel</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-slate-300">
+                        <CheckCircle2 className="w-4 h-4 text-amber-500" />
+                        <span>Enregistrement automatique de l'acheteur avec justificatifs</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-slate-300">
+                        <CheckCircle2 className="w-4 h-4 text-amber-500" />
+                        <span>Paiement sécurisé et intégration comptable instantanée</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+                    <span className="text-[10px] font-mono text-amber-500 uppercase tracking-widest block font-bold">Répartition Financière Type</span>
+                    <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-850 space-y-3 text-xs">
+                      <div className="flex justify-between font-bold text-white">
+                        <span>Vente de Terrain (Cocody, Abidjan)</span>
+                        <span className="text-emerald-400 font-semibold font-mono">Enregistré</span>
+                      </div>
+                      <div className="pt-2 border-t border-slate-850 space-y-2 font-mono text-[11px]">
+                        <div className="flex justify-between text-slate-300">
+                          <span>Prix de vente final :</span>
+                          <span className="font-semibold text-white">45 000 000 FCFA</span>
+                        </div>
+                        <div className="flex justify-between text-amber-400">
+                          <span>Commission Plateforme (10%) :</span>
+                          <span className="font-semibold">- 4 500 000 FCFA</span>
+                        </div>
+                        <div className="flex justify-between text-emerald-400 font-bold border-t border-dashed border-slate-800 pt-2 text-xs">
+                          <span>Net reversé au propriétaire (90%) :</span>
+                          <span>40 500 000 FCFA</span>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-slate-850 text-[10px] text-slate-500 flex justify-between">
+                        <span>Acheteur : Kouadio N'Goran</span>
+                        <span>Mode : Virement Bancaire</span>
                       </div>
                     </div>
                   </div>

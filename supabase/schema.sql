@@ -55,17 +55,18 @@ CREATE TABLE IF NOT EXISTS public.properties (
     agency_id UUID REFERENCES public.agencies(id) ON DELETE CASCADE NOT NULL,
     name TEXT NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('Appartement', 'Villa', 'Immeuble', 'Terrain', 'Bureau', 'Magasin', 'Entrepôt')),
-    status TEXT NOT NULL DEFAULT 'Disponible' CHECK (status IN ('Disponible', 'Occupé', 'Réservé', 'En maintenance')),
+    status TEXT NOT NULL DEFAULT 'Disponible' CHECK (status IN ('Disponible', 'Occupé', 'Réservé', 'En maintenance', 'Vendu')),
     address TEXT NOT NULL,
     city TEXT NOT NULL,
     country TEXT NOT NULL,
     description TEXT,
     surface NUMERIC,
     rooms INTEGER,
-    rental_value NUMERIC NOT NULL, -- Loyer mensuel HC recommandé
+    rental_value NUMERIC NOT NULL, -- Loyer mensuel HC ou prix de vente
     gallery TEXT[], -- Tableau de liens de photos
     latitude NUMERIC,
     longitude NUMERIC,
+    listing_type TEXT NOT NULL DEFAULT 'Location' CHECK (listing_type IN ('Location', 'Vente')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -195,6 +196,22 @@ CREATE TABLE IF NOT EXISTS public.social_housing_applications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Table des Transactions de Vente (Maison / Terrain)
+CREATE TABLE IF NOT EXISTS public.sales_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agency_id UUID REFERENCES public.agencies(id) ON DELETE CASCADE NOT NULL,
+    property_id UUID REFERENCES public.properties(id) ON DELETE RESTRICT NOT NULL,
+    buyer_name TEXT NOT NULL,
+    buyer_phone TEXT NOT NULL,
+    sale_price NUMERIC NOT NULL,
+    commission_amount NUMERIC NOT NULL, -- 10% de commission
+    net_owner_amount NUMERIC NOT NULL,   -- 90% net propriétaire
+    payment_method TEXT CHECK (payment_method IN ('Orange Money', 'MTN Money', 'Wave', 'Virement', 'Espèces')),
+    reference TEXT,
+    status TEXT NOT NULL DEFAULT 'Finalisé' CHECK (status IN ('Finalisé', 'En attente')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- -----------------------------------------------------------------------------
 -- 3. SÉCURITÉ & ROW LEVEL SECURITY (RLS)
 -- -----------------------------------------------------------------------------
@@ -213,6 +230,7 @@ ALTER TABLE public.maintenance_tickets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.crm_leads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.social_housing_applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sales_transactions ENABLE ROW LEVEL SECURITY;
 
 -- Politiques de Sécurité : Accès aux données selon l'agence de l'utilisateur
 
@@ -268,6 +286,9 @@ CREATE POLICY agency_access_crm_leads ON public.crm_leads
 CREATE POLICY agency_access_social_housing ON public.social_housing_applications
     FOR ALL USING (agency_id = public.get_user_agency_id());
 
+CREATE POLICY agency_access_sales_transactions ON public.sales_transactions
+    FOR ALL USING (agency_id = public.get_user_agency_id());
+
 -- -----------------------------------------------------------------------------
 -- 4. INDEXES POUR LA PERFORMANCE
 -- -----------------------------------------------------------------------------
@@ -283,3 +304,5 @@ CREATE INDEX IF NOT EXISTS idx_maintenance_property_id ON public.maintenance_tic
 CREATE INDEX IF NOT EXISTS idx_documents_agency_id ON public.documents(agency_id);
 CREATE INDEX IF NOT EXISTS idx_crm_leads_agency_id ON public.crm_leads(agency_id);
 CREATE INDEX IF NOT EXISTS idx_social_housing_agency_id ON public.social_housing_applications(agency_id);
+CREATE INDEX IF NOT EXISTS idx_sales_transactions_agency_id ON public.sales_transactions(agency_id);
+CREATE INDEX IF NOT EXISTS idx_sales_transactions_property_id ON public.sales_transactions(property_id);

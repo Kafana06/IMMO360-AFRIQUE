@@ -30,11 +30,11 @@ import {
   MapPin,
   Sparkles
 } from 'lucide-react';
-import { mockSupabase, Agency, Property, Landlord, Tenant, Lease, Payment, Receipt, MaintenanceTicket, CRMLead, SocialHousingApplication } from '@/lib/supabase/mock';
+import { mockSupabase, Agency, Property, Landlord, Tenant, Lease, Payment, Receipt, MaintenanceTicket, CRMLead, SocialHousingApplication, SaleTransaction } from '@/lib/supabase/mock';
 import Link from 'next/link';
 
 export default function DashboardPage() {
-  const [activeMenu, setActiveMenu] = useState<'overview' | 'properties' | 'landlords' | 'tenants' | 'leases' | 'payments' | 'receipts' | 'maintenance' | 'crm' | 'social' | 'settings' | 'saas' | 'contact'>('overview');
+  const [activeMenu, setActiveMenu] = useState<'overview' | 'properties' | 'sales' | 'landlords' | 'tenants' | 'leases' | 'payments' | 'receipts' | 'maintenance' | 'crm' | 'social' | 'settings' | 'saas' | 'contact'>('overview');
   
   // State réactif de la simulation de base de données
   const [currentAgency, setCurrentAgency] = useState(mockSupabase.getAgency());
@@ -48,6 +48,7 @@ export default function DashboardPage() {
   const [tickets, setTickets] = useState<(MaintenanceTicket & { property: Property })[]>([]);
   const [crmLeads, setCrmLeads] = useState<CRMLead[]>([]);
   const [socialApps, setSocialApps] = useState<(SocialHousingApplication & { property?: Property })[]>([]);
+  const [sales, setSales] = useState<(SaleTransaction & { property: Property })[]>([]);
 
   // Filtres actifs pour le catalogue des biens
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('Tous');
@@ -125,7 +126,18 @@ export default function DashboardPage() {
     description: '',
     surface: 80,
     rooms: 3,
-    rental_value: 400000
+    rental_value: 400000,
+    listing_type: 'Location' as Property['listing_type']
+  });
+
+  const [saleModalOpen, setSaleModalOpen] = useState(false);
+  const [newSale, setNewSale] = useState({
+    property_id: '',
+    buyer_name: '',
+    buyer_phone: '',
+    sale_price: 0,
+    payment_method: 'Wave' as SaleTransaction['payment_method'],
+    reference: ''
   });
 
   const [newLease, setNewLease] = useState({
@@ -241,6 +253,7 @@ export default function DashboardPage() {
     setTickets(mockSupabase.getMaintenanceTickets());
     setCrmLeads(mockSupabase.getCRMLeads());
     setSocialApps(mockSupabase.getSocialHousingApplications());
+    setSales(mockSupabase.getSaleTransactions());
   };
 
   useEffect(() => {
@@ -305,13 +318,42 @@ export default function DashboardPage() {
       surface: Number(newProp.surface),
       rooms: Number(newProp.rooms),
       rental_value: Number(newProp.rental_value),
+      listing_type: newProp.listing_type || 'Location',
       gallery: ['https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=800&q=80']
     });
 
     reloadData();
     setPropertyModalOpen(false);
-    setNewProp({ name: '', type: 'Appartement', address: '', city: '', description: '', surface: 80, rooms: 3, rental_value: 400000 });
+    setNewProp({ name: '', type: 'Appartement', address: '', city: '', description: '', surface: 80, rooms: 3, rental_value: 400000, listing_type: 'Location' });
     showToast(`Bien "${created.name}" ajouté avec succès dans l'espace ${currentAgency.name}.`);
+  };
+
+  const handleAddSaleTransaction = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSale.property_id || !newSale.buyer_name || !newSale.buyer_phone) {
+      showToast("Veuillez remplir toutes les informations obligatoires.");
+      return;
+    }
+    
+    const targetProp = properties.find(p => p.id === newSale.property_id);
+    if (!targetProp) return;
+    
+    const created = mockSupabase.addSaleTransaction({
+      property_id: newSale.property_id,
+      buyer_name: newSale.buyer_name,
+      buyer_phone: newSale.buyer_phone,
+      sale_price: Number(newSale.sale_price) || targetProp.rental_value,
+      payment_method: newSale.payment_method,
+      reference: newSale.reference || `TX-SALE-${Math.floor(Math.random() * 900000)}`,
+      status: 'Finalisé'
+    });
+    
+    reloadData();
+    setSaleModalOpen(false);
+    
+    const comm = Math.round(created.sale_price * 0.1);
+    
+    showToast(`Vente de "${targetProp.name}" finalisée ! Prix : ${created.sale_price.toLocaleString()} ${currentAgency.currency}. Commission 10% (${comm.toLocaleString()}) prélevée.`);
   };
 
   const handleAddLease = (e: React.FormEvent) => {
@@ -550,6 +592,7 @@ export default function DashboardPage() {
                 {[
                   { id: 'overview', label: 'Aperçu général', icon: TrendingUp },
                   { id: 'properties', label: 'Gestion des Biens', icon: Building2 },
+                  { id: 'sales', label: 'Ventes & Cessions', icon: CreditCard },
                   { id: 'landlords', label: 'Propriétaires', icon: Users },
                   { id: 'tenants', label: 'Locataires', icon: Users },
                   { id: 'leases', label: 'Contrats de bail', icon: FileText },
@@ -716,6 +759,7 @@ export default function DashboardPage() {
                     {[
                       { id: 'overview', label: 'Aperçu général', icon: TrendingUp },
                       { id: 'properties', label: 'Gestion des Biens', icon: Building2 },
+                      { id: 'sales', label: 'Ventes & Cessions', icon: CreditCard },
                       { id: 'landlords', label: 'Propriétaires', icon: Users },
                       { id: 'tenants', label: 'Locataires', icon: Users },
                       { id: 'leases', label: 'Contrats de bail', icon: FileText },
@@ -1237,6 +1281,178 @@ export default function DashboardPage() {
                 ))}
               </div>
 
+            </div>
+          )}
+
+          {/* GESTION DES VENTES (SALES) VIEW */}
+          {activeMenu === 'sales' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <div>
+                  <h1 className="font-title text-2xl font-extrabold text-slate-900">Ventes & Cessions de Biens</h1>
+                  <p className="text-xs text-slate-500">Gerez les ventes de maisons et de terrains. La plateforme preleve automatiquement 10% sur chaque transaction.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const firstSaleProp = properties.find(p => p.listing_type === 'Vente' && p.status === 'Disponible');
+                    setNewSale({
+                      property_id: firstSaleProp?.id || '',
+                      buyer_name: '',
+                      buyer_phone: '',
+                      sale_price: firstSaleProp?.rental_value || 0,
+                      payment_method: 'Wave',
+                      reference: ''
+                    });
+                    setSaleModalOpen(true);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-slate-900/10 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" /> Enregistrer une Vente
+                </button>
+              </div>
+
+              {/* KPIs de ventes */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[
+                  { label: "Volume de Vente Global", val: `${sales.reduce((acc, s) => acc + s.sale_price, 0).toLocaleString()} ${currentAgency.currency}`, desc: `${sales.length} transactions finalisees`, icon: TrendingUp },
+                  { label: "Commissions Prelevees (10%)", val: `${sales.reduce((acc, s) => acc + s.commission_amount, 0).toLocaleString()} ${currentAgency.currency}`, desc: "Revenu SaaS / Agence", icon: DollarSign, color: "text-amber-655" },
+                  { label: "Reverse aux Proprietaires (90%)", val: `${sales.reduce((acc, s) => acc + s.net_owner_amount, 0).toLocaleString()} ${currentAgency.currency}`, desc: "Payouts Mobile Money / Virement", icon: CreditCard, color: "text-emerald-600" },
+                  { label: "Biens en Vente Disponibles", val: properties.filter(p => p.listing_type === 'Vente' && p.status === 'Disponible').length, desc: "Maisons & terrains", icon: Building2 }
+                ].map((stat, idx) => (
+                  <div key={idx} className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-slate-500 font-semibold">{stat.label}</span>
+                      <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center">
+                        <stat.icon className="w-4 h-4 text-slate-500" />
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <h3 className={`text-xl font-bold font-mono tracking-tight ${stat.color || 'text-slate-900'}`}>{stat.val}</h3>
+                      <span className="text-[10px] text-slate-400 block mt-1 font-medium">{stat.desc}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Section 1: Biens en vente disponibles */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-slate-900 text-left">Catalogue des Biens en Vente</h3>
+                {properties.filter(p => p.listing_type === 'Vente' && p.status === 'Disponible').length === 0 ? (
+                  <div className="p-8 rounded-3xl bg-white border border-slate-200 text-center text-xs text-slate-400">
+                    Aucun terrain ou maison n'est actuellement disponible a la vente. Ajoutez un bien avec l'option "Vente" pour le lister.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {properties.filter(p => p.listing_type === 'Vente' && p.status === 'Disponible').map(prop => (
+                      <div key={prop.id} className="rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-md hover:border-slate-350 transition-all text-left group">
+                        <div className="relative aspect-video w-full bg-slate-100 overflow-hidden">
+                          <img 
+                            src={prop.gallery[0]} 
+                            alt={prop.name}
+                            className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+                          />
+                          <span className="absolute top-4 right-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white shadow">
+                            En Vente
+                          </span>
+                        </div>
+
+                        <div className="p-6 flex-1 flex flex-col justify-between">
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-mono text-amber-600 font-bold uppercase tracking-wider">{prop.type}</span>
+                            <h3 className="text-base font-bold text-slate-900">{prop.name}</h3>
+                            <p className="text-xs text-slate-500 flex items-center gap-1">
+                              <MapPin className="w-3.5 h-3.5 text-slate-400" /> {prop.address}, {prop.city}
+                            </p>
+                            <p className="text-xs text-slate-600 line-clamp-2 mt-2 leading-relaxed">{prop.description}</p>
+                          </div>
+
+                          <div className="pt-4 mt-4 border-t border-slate-150 flex justify-between items-center">
+                            <div>
+                              <span className="text-[10px] text-slate-400 block font-semibold">PRIX DE VENTE</span>
+                              <span className="text-sm font-bold font-mono text-slate-900">{prop.rental_value.toLocaleString()} {currentAgency.currency}</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setNewSale({
+                                  property_id: prop.id,
+                                  buyer_name: '',
+                                  buyer_phone: '',
+                                  sale_price: prop.rental_value,
+                                  payment_method: 'Wave',
+                                  reference: ''
+                                });
+                                setSaleModalOpen(true);
+                              }}
+                              className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all cursor-pointer shadow"
+                            >
+                              Vendre
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Section 2: Historique des ventes finalisees */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-slate-900 text-left">Historique des Transactions de Vente</h3>
+                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden text-left">
+                  {sales.length === 0 ? (
+                    <div className="py-6 text-center text-slate-450 text-xs">
+                      Aucune transaction de vente n'a encore ete finalisee.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-slate-400 font-bold text-xs">
+                            <th className="pb-3 font-semibold text-left">Bien Vendu</th>
+                            <th className="pb-3 font-semibold text-left">Acquereur (Acheteur)</th>
+                            <th className="pb-3 font-semibold text-left">Prix de Vente</th>
+                            <th className="pb-3 font-semibold text-left">Repartition (10% / 90%)</th>
+                            <th className="pb-3 font-semibold text-left">Paiement</th>
+                            <th className="pb-3 font-semibold text-right">Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {sales.map(sale => (
+                            <tr key={sale.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="py-4">
+                                <span className="font-bold text-slate-900 block text-xs">{sale.property.name}</span>
+                                <span className="text-[10px] text-slate-400 block font-mono">{sale.property.type} &bull; {sale.property.city}</span>
+                              </td>
+                              <td className="py-4">
+                                <span className="font-bold text-slate-850 block text-xs">{sale.buyer_name}</span>
+                                <span className="text-[10px] text-slate-500 block font-mono">{sale.buyer_phone}</span>
+                              </td>
+                              <td className="py-4 font-mono font-bold text-slate-900 text-xs">
+                                {sale.sale_price.toLocaleString()} {currentAgency.currency}
+                              </td>
+                              <td className="py-4">
+                                <div className="space-y-1 text-[10px] font-mono">
+                                  <span className="block text-amber-600 font-bold">⚡ Commission (10%) : {sale.commission_amount.toLocaleString()} {currentAgency.currency}</span>
+                                  <span className="block text-emerald-600 font-bold">👤 Net Vendeur (90%) : {sale.net_owner_amount.toLocaleString()} {currentAgency.currency}</span>
+                                </div>
+                              </td>
+                              <td className="py-4">
+                                <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 text-[10px] font-bold block w-fit">
+                                  {sale.payment_method}
+                                </span>
+                                <span className="text-[10px] text-slate-400 block font-mono mt-1">{sale.reference}</span>
+                              </td>
+                              <td className="py-4 text-right text-xs text-slate-500">
+                                {new Date(sale.created_at).toLocaleDateString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -2340,92 +2556,130 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* TAB 3: COMMISSIONS & REVERSEMENTS (2% PLATFORM LEDGER) */}
+              {/* TAB 3: COMMISSIONS & REVERSEMENTS (2% PLATFORM LEDGER & 10% SALES) */}
               {saasTab === 'commissions' && (
                 <div className="space-y-6 text-left animate-fadeIn">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
-                      <span className="text-xs font-mono text-slate-400 font-bold uppercase tracking-wider block mb-1">Commissions Collectées (2%)</span>
-                      <div className="text-2xl font-bold font-mono text-slate-900">
-                        {(payments.filter(p => p.status === 'Payé').reduce((acc, p) => acc + p.amount, 0) * 0.02).toLocaleString()} FCFA
-                      </div>
-                      <span className="text-[10px] text-slate-400 block mt-1">Calculé sur les loyers encaissés par les agences</span>
-                    </div>
-                    <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
-                      <span className="text-xs font-mono text-slate-400 font-bold uppercase tracking-wider block mb-1">Reversements Effectués</span>
-                      <div className="text-2xl font-bold font-mono text-emerald-600">
-                        {(payments.filter(p => p.status === 'Payé').reduce((acc, p) => acc + p.amount, 0) * 0.98).toLocaleString()} FCFA
-                      </div>
-                      <span className="text-[10px] text-slate-400 block mt-1">Transférés automatiquement aux propriétaires</span>
-                    </div>
-                    <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
-                      <div>
-                        <span className="text-xs font-mono text-slate-400 font-bold uppercase tracking-wider block mb-1">Reversements en attente</span>
-                        <div className="text-2xl font-bold font-mono text-amber-500">
-                          {(payments.filter(p => p.status !== 'Payé').reduce((acc, p) => acc + p.amount, 0) * 0.98).toLocaleString()} FCFA
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => showToast("Reversements Wave/Orange Money déclenchés avec succès.")}
-                        className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs mt-3 transition-colors cursor-pointer"
-                      >
-                        Exécuter les reversements
-                      </button>
-                    </div>
-                  </div>
+                  {(() => {
+                    const totalRentCommissions = payments.filter(p => p.status === 'Payé').reduce((acc, p) => acc + p.amount, 0) * 0.02;
+                    const totalSalesCommissions = sales.reduce((acc, s) => acc + s.commission_amount, 0);
+                    const totalCommissions = totalRentCommissions + totalSalesCommissions;
 
-                  <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
-                    <h3 className="font-title text-base font-bold text-slate-900 mb-4">Livre des Commissions (Historique Temps Réel)</h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-slate-200 text-slate-400 font-bold text-xs">
-                            <th className="pb-3 font-semibold text-left">Locataire / Bien</th>
-                            <th className="pb-3 font-semibold text-left">Loyer Total</th>
-                            <th className="pb-3 font-semibold text-left">Commission (2%)</th>
-                            <th className="pb-3 font-semibold text-left">Net Propriétaire (98%)</th>
-                            <th className="pb-3 font-semibold text-left">Statut Reversement</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {payments.map(p => {
-                            const comm = p.amount * 0.02;
-                            const net = p.amount * 0.98;
-                            return (
-                              <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="py-3.5">
-                                  <span className="font-bold text-slate-900 block text-xs">
-                                    {p.lease.tenant.first_name} {p.lease.tenant.last_name}
-                                  </span>
-                                  <span className="text-[10px] text-slate-400 block">
-                                    {p.lease.property.name} - {p.lease.property.city}
-                                  </span>
-                                </td>
-                                <td className="py-3.5 text-xs font-mono font-bold text-slate-700">
-                                  {p.amount.toLocaleString()} FCFA
-                                </td>
-                                <td className="py-3.5 text-xs font-mono text-amber-600 font-bold">
-                                  {comm.toLocaleString()} FCFA
-                                </td>
-                                <td className="py-3.5 text-xs font-mono text-emerald-600 font-bold">
-                                  {net.toLocaleString()} FCFA
-                                </td>
-                                <td className="py-3.5">
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                    p.status === 'Payé' 
-                                      ? 'bg-emerald-100 text-emerald-700' 
-                                      : 'bg-slate-100 text-slate-500'
-                                  }`}>
-                                    {p.status === 'Payé' ? 'Reversé (Wave/OM API)' : 'En attente loyer'}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                    const totalRentPayouts = payments.filter(p => p.status === 'Payé').reduce((acc, p) => acc + p.amount, 0) * 0.98;
+                    const totalSalesPayouts = sales.reduce((acc, s) => acc + s.net_owner_amount, 0);
+                    const totalPayouts = totalRentPayouts + totalSalesPayouts;
+
+                    const pendingRentPayouts = payments.filter(p => p.status !== 'Payé').reduce((acc, p) => acc + p.amount, 0) * 0.98;
+
+                    const commissionsHistory = [
+                      ...payments.filter(p => p.status === 'Payé').map(p => ({
+                        id: p.id,
+                        type: 'Location (2%)',
+                        label: `${p.lease.tenant.first_name} ${p.lease.tenant.last_name}`,
+                        sublabel: `${p.lease.property.name} - ${p.lease.property.city}`,
+                        total: p.amount,
+                        commission: p.amount * 0.02,
+                        net: p.amount * 0.98,
+                        status: 'Reversé (Wave/OM API)',
+                        date: p.payment_date ? new Date(p.payment_date).toLocaleDateString() : 'N/A'
+                      })),
+                      ...sales.map(s => ({
+                        id: s.id,
+                        type: 'Vente (10%)',
+                        label: `Acheteur: ${s.buyer_name}`,
+                        sublabel: `${s.property.name} - ${s.property.city}`,
+                        total: s.sale_price,
+                        commission: s.commission_amount,
+                        net: s.net_owner_amount,
+                        status: 'Reversé (Wave/OM API)',
+                        date: new Date(s.created_at).toLocaleDateString()
+                      }))
+                    ];
+
+                    return (
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
+                            <span className="text-xs font-mono text-slate-400 font-bold uppercase tracking-wider block mb-1">Commissions Collectées</span>
+                            <div className="text-2xl font-bold font-mono text-slate-900">
+                              {totalCommissions.toLocaleString()} FCFA
+                            </div>
+                            <span className="text-[10px] text-slate-400 block mt-1">2% sur loyers payés + 10% sur ventes finalisées</span>
+                          </div>
+                          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
+                            <span className="text-xs font-mono text-slate-400 font-bold uppercase tracking-wider block mb-1">Reversements Effectués</span>
+                            <div className="text-2xl font-bold font-mono text-emerald-600">
+                              {totalPayouts.toLocaleString()} FCFA
+                            </div>
+                            <span className="text-[10px] text-slate-400 block mt-1">Transférés automatiquement aux propriétaires (98% / 90%)</span>
+                          </div>
+                          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
+                            <div>
+                              <span className="text-xs font-mono text-slate-400 font-bold uppercase tracking-wider block mb-1">Reversements en attente</span>
+                              <div className="text-2xl font-bold font-mono text-amber-500">
+                                {pendingRentPayouts.toLocaleString()} FCFA
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => showToast("Reversements Wave/Orange Money déclenchés avec succès.")}
+                              className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs mt-3 transition-colors cursor-pointer text-center"
+                            >
+                              Exécuter les reversements
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
+                          <h3 className="font-title text-base font-bold text-slate-900 mb-4">Livre des Commissions & Reversements (Consolidé)</h3>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b border-slate-200 text-slate-400 font-bold text-xs">
+                                  <th className="pb-3 font-semibold text-left">Bénéficiaire / Transaction</th>
+                                  <th className="pb-3 font-semibold text-left">Type</th>
+                                  <th className="pb-3 font-semibold text-left">Volume Total</th>
+                                  <th className="pb-3 font-semibold text-left">Commission</th>
+                                  <th className="pb-3 font-semibold text-left">Net Reversé</th>
+                                  <th className="pb-3 font-semibold text-left">Statut</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {commissionsHistory.map(row => (
+                                  <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                                    <td className="py-3.5 text-left">
+                                      <span className="font-bold text-slate-900 block text-xs">
+                                        {row.label}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400 block">
+                                        {row.sublabel}
+                                      </span>
+                                    </td>
+                                    <td className="py-3.5 text-left text-xs font-semibold text-slate-600">
+                                      {row.type}
+                                    </td>
+                                    <td className="py-3.5 text-left text-xs font-mono font-bold text-slate-700">
+                                      {row.total.toLocaleString()} FCFA
+                                    </td>
+                                    <td className="py-3.5 text-left text-xs font-mono text-amber-600 font-bold">
+                                      {row.commission.toLocaleString()} FCFA
+                                    </td>
+                                    <td className="py-3.5 text-left text-xs font-mono text-emerald-600 font-bold">
+                                      {row.net.toLocaleString()} FCFA
+                                    </td>
+                                    <td className="py-3.5 text-left">
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                                        {row.status}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400 block mt-1">{row.date}</span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -2837,7 +3091,20 @@ export default function DashboardPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1 font-medium">Loyer HC mensuel</label>
+                    <label className="text-xs text-slate-400 block mb-1 font-medium">Transaction</label>
+                    <select
+                      value={newProp.listing_type || 'Location'}
+                      onChange={(e) => setNewProp({ ...newProp, listing_type: e.target.value as any })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none"
+                    >
+                      <option value="Location">Location</option>
+                      <option value="Vente">Vente</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-medium">
+                      {newProp.listing_type === 'Vente' ? 'Prix de Vente' : 'Loyer HC mensuel'}
+                    </label>
                     <input
                       type="number"
                       required
@@ -2847,7 +3114,6 @@ export default function DashboardPage() {
                     />
                   </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs text-slate-400 block mb-1 font-medium">Surface (m²)</label>
@@ -3649,7 +3915,148 @@ export default function DashboardPage() {
           </div>
         )}
       </AnimatePresence>
- 
+
+      {/* MODAL 5: ENREGISTRER UNE VENTE (SALES) */}
+      <AnimatePresence>
+        {saleModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 animate-fadeIn">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSaleModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl border border-slate-200 shadow-2xl p-8 max-w-lg w-full relative z-10 text-left overflow-y-auto max-h-[85vh]"
+            >
+              <h3 className="font-title text-lg font-bold text-slate-900 mb-2">Finaliser la Vente d'un Bien</h3>
+              <p className="text-xs text-slate-400 mb-6">Renseignez les details de la transaction pour enregistrer la vente de ce terrain ou de cette maison.</p>
+
+              <form onSubmit={handleAddSaleTransaction} className="space-y-4 text-sm">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-medium">Selectionner le Bien en Vente</label>
+                  <select
+                    value={newSale.property_id}
+                    onChange={(e) => {
+                      const prop = properties.find(p => p.id === e.target.value);
+                      setNewSale({ 
+                        ...newSale, 
+                        property_id: e.target.value,
+                        sale_price: prop ? prop.rental_value : 0
+                      });
+                    }}
+                    required
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none"
+                  >
+                    <option value="">-- Choisir un bien --</option>
+                    {properties.filter(p => p.listing_type === 'Vente' && p.status === 'Disponible').map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.rental_value.toLocaleString()} {currentAgency.currency})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-medium">Nom complet de l'acquereur (Acheteur) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newSale.buyer_name}
+                    onChange={(e) => setNewSale({ ...newSale, buyer_name: e.target.value })}
+                    placeholder="Ex: Kouadio N'Goran"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-medium">Telephone de l'acquereur *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newSale.buyer_phone}
+                    onChange={(e) => setNewSale({ ...newSale, buyer_phone: e.target.value })}
+                    placeholder="Ex: +225 07 11 22 33 44"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 font-mono focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-medium">Prix Final Convenu</label>
+                    <input
+                      type="number"
+                      required
+                      value={newSale.sale_price}
+                      onChange={(e) => setNewSale({ ...newSale, sale_price: Number(e.target.value) })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 font-mono focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-medium">Mode de Reglement</label>
+                    <select
+                      value={newSale.payment_method}
+                      onChange={(e) => setNewSale({ ...newSale, payment_method: e.target.value as any })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none cursor-pointer"
+                    >
+                      <option value="Wave">Wave</option>
+                      <option value="Orange Money">Orange Money</option>
+                      <option value="MTN Money">MTN Money</option>
+                      <option value="Virement">Virement Bancaire</option>
+                      <option value="Especes">Especes</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-medium">Reference transaction (N&deg; Virement, Ref Mobile Money)</label>
+                  <input
+                    type="text"
+                    value={newSale.reference}
+                    onChange={(e) => setNewSale({ ...newSale, reference: e.target.value })}
+                    placeholder="Ex: VR-SGCI-99812"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none font-mono"
+                  />
+                </div>
+
+                {newSale.sale_price > 0 && (
+                  <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs font-mono text-slate-700 space-y-1">
+                    <span className="block font-bold uppercase tracking-wider text-[9px] text-amber-800">Calcul de la Repartition (10% Commission)</span>
+                    <div className="flex justify-between mt-1">
+                      <span>&bull; Commission SaaS / Agence (10%) :</span>
+                      <strong className="text-amber-800">{(Math.round(newSale.sale_price * 0.1)).toLocaleString()} {currentAgency.currency}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>&bull; Net Reverse au Vendeur (90%) :</span>
+                      <strong className="text-emerald-700">{(Math.round(newSale.sale_price * 0.9)).toLocaleString()} {currentAgency.currency}</strong>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setSaleModalOpen(false)}
+                    className="w-1/2 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 font-semibold text-xs text-center cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="w-1/2 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-lg cursor-pointer"
+                  >
+                    Valider la Vente
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

@@ -34,17 +34,20 @@ ON CONFLICT (id) DO NOTHING;
 -- -----------------------------------------------------------------------------
 -- 4. BIENS IMMOBILIERS
 -- -----------------------------------------------------------------------------
-INSERT INTO public.properties (id, agency_id, name, type, status, address, city, country, description, surface, rooms, rental_value, gallery)
+INSERT INTO public.properties (id, agency_id, name, type, status, address, city, country, description, surface, rooms, rental_value, gallery, listing_type)
 VALUES
 -- Propriétés de Babi Immo (Côte d'Ivoire)
-('p1111111-1111-1111-1111-111111111111', 'a1111111-1111-1111-1111-111111111111', 'Villa Prestige Cocody', 'Villa', 'Occupé', 'Rue des Jardins, Cocody Deux-Plateaux', 'Abidjan', 'Côte d''Ivoire', 'Magnifique villa duplex de 5 pièces avec piscine, jardin paysager, garage 2 véhicules, portail électrique et sécurité H24.', 350.0, 5, 1500000, ARRAY['https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80']),
-('p1111112-1111-1111-1111-111111111112', 'a1111111-1111-1111-1111-111111111111', 'Appartement Chic Zone 4', 'Appartement', 'Occupé', 'Rue Paul Langevin, Zone 4C, Marcory', 'Abidjan', 'Côte d''Ivoire', 'Appartement F3 haut standing meublé dans un immeuble récent avec ascenseur, groupe électrogène, salle de sport commune et conciergerie.', 120.0, 3, 850000, ARRAY['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80']),
-('p1111113-1111-1111-1111-111111111113', 'a1111111-1111-1111-1111-111111111111', 'Bureaux d''Affaires Plateau', 'Bureau', 'Disponible', 'Avenue Nogues, Plateau', 'Abidjan', 'Côte d''Ivoire', 'Plateau de bureaux cloisonné de 250m2, câblage réseau complet, climatisation centrale, parfait pour siège social ou agence.', 250.0, 6, 2500000, ARRAY['https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80']),
-('p1111114-1111-1111-1111-111111111114', 'a1111111-1111-1111-1111-111111111111', 'Villa Sociale Abobo (Eligible CI)', 'Villa', 'Disponible', 'Quartier Avocatier, Abobo', 'Abidjan', 'Côte d''Ivoire', 'Villa basse de 3 pièces dans le cadre du programme de logements sociaux. Loyer modéré réglementé.', 75.0, 3, 120000, ARRAY['https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80']),
+('p1111111-1111-1111-1111-111111111111', 'a1111111-1111-1111-1111-111111111111', 'Villa Prestige Cocody', 'Villa', 'Occupé', 'Rue des Jardins, Cocody Deux-Plateaux', 'Abidjan', 'Côte d''Ivoire', 'Magnifique villa duplex de 5 pièces avec piscine, jardin paysager, garage 2 véhicules, portail électrique et sécurité H24.', 350.0, 5, 1500000, ARRAY['https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80'], 'Location'),
+('p1111112-1111-1111-1111-111111111112', 'a1111111-1111-1111-1111-111111111111', 'Appartement Chic Zone 4', 'Appartement', 'Occupé', 'Rue Paul Langevin, Zone 4C, Marcory', 'Abidjan', 'Côte d''Ivoire', 'Appartement F3 haut standing meublé dans un immeuble récent avec ascenseur, groupe électrogène, salle de sport commune et conciergerie.', 120.0, 3, 850000, ARRAY['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80'], 'Location'),
+('p1111113-1111-1111-1111-111111111113', 'a1111111-1111-1111-1111-111111111111', 'Bureaux d''Affaires Plateau', 'Bureau', 'Disponible', 'Avenue Nogues, Plateau', 'Abidjan', 'Côte d''Ivoire', 'Plateau de bureaux cloisonné de 250m2, câblage réseau complet, climatisation centrale, parfait pour siège social ou agence.', 250.0, 6, 2500000, ARRAY['https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80'], 'Location'),
+('p1111114-1111-1111-1111-111111111114', 'a1111111-1111-1111-1111-111111111111', 'Villa Sociale Abobo (Eligible CI)', 'Villa', 'Disponible', 'Quartier Avocatier, Abobo', 'Abidjan', 'Côte d''Ivoire', 'Villa basse de 3 pièces dans le cadre du programme de logements sociaux. Loyer modéré réglementé.', 75.0, 3, 120000, ARRAY['https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80'], 'Location'),
+('p1111115-1111-1111-1111-111111111115', 'a1111111-1111-1111-1111-111111111111', 'Terrain Cocody Angré', 'Terrain', 'Disponible', 'Près du CHU d''Angré, Cocody', 'Abidjan', 'Côte d''Ivoire', 'Superbe lotissement de 500m2 approuvé avec ACD, prêt pour construction immédiate dans une zone hautement résidentielle.', 500.0, 0, 45000000, ARRAY['https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80'], 'Vente'),
+('p1111116-1111-1111-1111-111111111116', 'a1111111-1111-1111-1111-111111111111', 'Terrain Zone Ind. Yopougon', 'Terrain', 'Vendu', 'Zone Industrielle, Yopougon', 'Abidjan', 'Côte d''Ivoire', 'Terrain commercial clôturé de 1000m2 avec accès route bitumée, idéal pour entrepôt ou usine.', 1000.0, 0, 30000000, ARRAY['https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80'], 'Vente'),
 
 -- Propriétés de Teranga Agence Luxe (Sénégal)
-('p2222221-2222-2222-2222-222222222221', 'a2222222-2222-2222-2222-222222222222', 'Penthouse Almadies Ocean View', 'Appartement', 'Occupé', 'Corniche Ouest, Les Almadies', 'Dakar', 'Sénégal', 'Penthouse exceptionnel de 4 pièces avec vue panoramique sur l''Océan Atlantique, piscine privée suspendue sur la terrasse, finitions marbre.', 280.0, 4, 3000000, ARRAY['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80']),
-('p2222222-2222-2222-2222-222222222222', 'a2222222-2222-2222-2222-222222222222', 'Magasin Commercial Dakar Plateau', 'Magasin', 'En maintenance', 'Avenue Léopold Sédar Senghor, Plateau', 'Dakar', 'Sénégal', 'Local commercial en rez-de-chaussée avec une grande vitrine passante, excellent emplacement commercial.', 90.0, 2, 1200000, ARRAY['https://images.unsplash.com/photo-1555529669-e69e7aa0db9a?auto=format&fit=crop&w=800&q=80'])
+('p2222221-2222-2222-2222-222222222221', 'a2222222-2222-2222-2222-222222222222', 'Penthouse Almadies Ocean View', 'Appartement', 'Occupé', 'Corniche Ouest, Les Almadies', 'Dakar', 'Sénégal', 'Penthouse exceptionnel de 4 pièces avec vue panoramique sur l''Océan Atlantique, piscine privée suspendue sur la terrasse, finitions marbre.', 280.0, 4, 3000000, ARRAY['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80'], 'Location'),
+('p2222222-2222-2222-2222-222222222222', 'a2222222-2222-2222-2222-222222222222', 'Magasin Commercial Dakar Plateau', 'Magasin', 'En maintenance', 'Avenue Léopold Sédar Senghor, Plateau', 'Dakar', 'Sénégal', 'Local commercial en rez-de-chaussée avec une grande vitrine passante, excellent emplacement commercial.', 90.0, 2, 1200000, ARRAY['https://images.unsplash.com/photo-1555529669-e69e7aa0db9a?auto=format&fit=crop&w=800&q=80'], 'Location'),
+('p2222223-2222-2222-2222-222222222223', 'a2222222-2222-2222-2222-222222222222', 'Maison Prestige Almadies', 'Villa', 'Disponible', 'Zone résidentielle, Les Almadies', 'Dakar', 'Sénégal', 'Somptueuse demeure contemporaine de 7 pièces, grand jardin arboré, piscine olympique et quartier diplomatique sécurisé.', 600.0, 7, 120000000, ARRAY['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80'], 'Vente')
 ON CONFLICT (id) DO NOTHING;
 
 -- Liaison Biens <-> Propriétaires
@@ -54,8 +57,11 @@ VALUES
 ('p1111112-1111-1111-1111-111111111112', 'l1111112-1111-1111-1111-111111111112'),
 ('p1111113-1111-1111-1111-111111111113', 'l1111111-1111-1111-1111-111111111111'),
 ('p1111114-1111-1111-1111-111111111114', 'l1111112-1111-1111-1111-111111111112'),
+('p1111115-1111-1111-1111-111111111115', 'l1111111-1111-1111-1111-111111111111'),
+('p1111116-1111-1111-1111-111111111116', 'l1111112-1111-1111-1111-111111111112'),
 ('p2222221-2222-2222-2222-222222222221', 'l2222221-2222-2222-2222-222222222221'),
-('p2222222-2222-2222-2222-222222222222', 'l2222221-2222-2222-2222-222222222221')
+('p2222222-2222-2222-2222-222222222222', 'l2222221-2222-2222-2222-222222222221'),
+('p2222223-2222-2222-2222-222222222223', 'l2222221-2222-2222-2222-222222222221')
 ON CONFLICT (property_id, landlord_id) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
@@ -143,4 +149,12 @@ INSERT INTO public.social_housing_applications (id, agency_id, beneficiary_first
 VALUES
 ('s1111111-1111-1111-1111-111111111111', 'a1111111-1111-1111-1111-111111111111', 'Bakary', 'Konaté', 'CI012345678', '+225 05 76 54 32 10', 180000, 5, 'Éligible', NULL),
 ('s1111112-1111-1111-1111-111111111112', 'a1111111-1111-1111-1111-111111111111', 'Yasmine', 'Gnakpa', 'CI987654321', '+225 07 11 22 33 44', 320000, 2, 'Attribué', 'p1111114-1111-1111-1111-111111111114')
+ON CONFLICT (id) DO NOTHING;
+
+-- -----------------------------------------------------------------------------
+-- 12. TRANSACTIONS DE VENTE (SALES_TRANSACTIONS)
+-- -----------------------------------------------------------------------------
+INSERT INTO public.sales_transactions (id, agency_id, property_id, buyer_name, buyer_phone, sale_price, commission_amount, net_owner_amount, payment_method, reference, status)
+VALUES
+('s1111111-2222-3333-4444-555555555555', 'a1111111-1111-1111-1111-111111111111', 'p1111116-1111-1111-1111-111111111116', 'Kouadio N''Goran', '+225 07 11 22 33 44', 30000000, 3000000, 27000000, 'Virement', 'VR-SGCI-88123', 'Finalisé')
 ON CONFLICT (id) DO NOTHING;

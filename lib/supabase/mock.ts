@@ -52,7 +52,7 @@ export interface Property {
   agency_id: string;
   name: string;
   type: 'Appartement' | 'Villa' | 'Immeuble' | 'Terrain' | 'Bureau' | 'Magasin' | 'Entrepôt';
-  status: 'Disponible' | 'Occupé' | 'Réservé' | 'En maintenance';
+  status: 'Disponible' | 'Occupé' | 'Réservé' | 'En maintenance' | 'Vendu';
   address: string;
   city: string;
   country: string;
@@ -63,6 +63,7 @@ export interface Property {
   gallery: string[];
   latitude?: number;
   longitude?: number;
+  listing_type?: 'Location' | 'Vente';
 }
 
 export interface Lease {
@@ -145,6 +146,21 @@ export interface SocialHousingApplication {
   family_size: number;
   eligibility_status: 'En cours' | 'Éligible' | 'Non éligible' | 'Attribué';
   attributed_property_id?: string;
+  created_at: string;
+}
+
+export interface SaleTransaction {
+  id: string;
+  agency_id: string;
+  property_id: string;
+  buyer_name: string;
+  buyer_phone: string;
+  sale_price: number;
+  commission_amount: number;
+  net_owner_amount: number;
+  payment_method: 'Orange Money' | 'MTN Money' | 'Wave' | 'Virement' | 'Espèces';
+  reference: string;
+  status: 'Finalisé' | 'En attente';
   created_at: string;
 }
 
@@ -247,7 +263,8 @@ let db_properties: Property[] = [
     surface: 350.0,
     rooms: 5,
     rental_value: 1500000,
-    gallery: ['https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80']
+    gallery: ['https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80'],
+    listing_type: 'Location'
   },
   {
     id: 'p1111112-1111-1111-1111-111111111112',
@@ -262,7 +279,8 @@ let db_properties: Property[] = [
     surface: 120.0,
     rooms: 3,
     rental_value: 850000,
-    gallery: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80']
+    gallery: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80'],
+    listing_type: 'Location'
   },
   {
     id: 'p1111113-1111-1111-1111-111111111113',
@@ -277,7 +295,8 @@ let db_properties: Property[] = [
     surface: 250.0,
     rooms: 6,
     rental_value: 2500000,
-    gallery: ['https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80']
+    gallery: ['https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80'],
+    listing_type: 'Location'
   },
   {
     id: 'p1111114-1111-1111-1111-111111111114',
@@ -292,7 +311,40 @@ let db_properties: Property[] = [
     surface: 75.0,
     rooms: 3,
     rental_value: 120000,
-    gallery: ['https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80']
+    gallery: ['https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80'],
+    listing_type: 'Location'
+  },
+  {
+    id: 'p1111115-1111-1111-1111-111111111115',
+    agency_id: 'a1111111-1111-1111-1111-111111111111',
+    name: 'Terrain Cocody Angré',
+    type: 'Terrain',
+    status: 'Disponible',
+    address: 'Près du CHU d\'Angré, Cocody',
+    city: 'Abidjan',
+    country: 'Côte d\'Ivoire',
+    description: 'Superbe lotissement de 500m2 approuvé avec ACD, prêt pour construction immédiate dans une zone hautement résidentielle.',
+    surface: 500.0,
+    rooms: 0,
+    rental_value: 45000000,
+    gallery: ['https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80'],
+    listing_type: 'Vente'
+  },
+  {
+    id: 'p1111116-1111-1111-1111-111111111116',
+    agency_id: 'a1111111-1111-1111-1111-111111111111',
+    name: 'Terrain Zone Ind. Yopougon',
+    type: 'Terrain',
+    status: 'Vendu',
+    address: 'Zone Industrielle, Yopougon',
+    city: 'Abidjan',
+    country: 'Côte d\'Ivoire',
+    description: 'Terrain commercial clôturé de 1000m2 avec accès route bitumée, idéal pour entrepôt ou usine.',
+    surface: 1000.0,
+    rooms: 0,
+    rental_value: 30000000,
+    gallery: ['https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80'],
+    listing_type: 'Vente'
   },
   {
     id: 'p2222221-2222-2222-2222-222222222221',
@@ -307,7 +359,8 @@ let db_properties: Property[] = [
     surface: 280.0,
     rooms: 4,
     rental_value: 3000000,
-    gallery: ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80']
+    gallery: ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80'],
+    listing_type: 'Location'
   },
   {
     id: 'p2222222-2222-2222-2222-222222222222',
@@ -322,7 +375,24 @@ let db_properties: Property[] = [
     surface: 90.0,
     rooms: 2,
     rental_value: 1200000,
-    gallery: ['https://images.unsplash.com/photo-1555529669-e69e7aa0db9a?auto=format&fit=crop&w=800&q=80']
+    gallery: ['https://images.unsplash.com/photo-1555529669-e69e7aa0db9a?auto=format&fit=crop&w=800&q=80'],
+    listing_type: 'Location'
+  },
+  {
+    id: 'p2222223-2222-2222-2222-222222222223',
+    agency_id: 'a2222222-2222-2222-2222-222222222222',
+    name: 'Maison Prestige Almadies',
+    type: 'Villa',
+    status: 'Disponible',
+    address: 'Zone résidentielle, Les Almadies',
+    city: 'Dakar',
+    country: 'Sénégal',
+    description: 'Somptueuse demeure contemporaine de 7 pièces, grand jardin arboré, piscine olympique et quartier diplomatique sécurisé.',
+    surface: 600.0,
+    rooms: 7,
+    rental_value: 120000000,
+    gallery: ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80'],
+    listing_type: 'Vente'
   }
 ];
 
@@ -629,6 +699,23 @@ let db_social_housing: SocialHousingApplication[] = [
   }
 ];
 
+let db_sales: SaleTransaction[] = [
+  {
+    id: 's1111111-2222-3333-4444-555555555555',
+    agency_id: 'a1111111-1111-1111-1111-111111111111',
+    property_id: 'p1111116-1111-1111-1111-111111111116',
+    buyer_name: 'Kouadio N\'Goran',
+    buyer_phone: '+225 07 11 22 33 44',
+    sale_price: 30000000,
+    commission_amount: 3000000,
+    net_owner_amount: 27000000,
+    payment_method: 'Virement',
+    reference: 'VR-SGCI-88123',
+    status: 'Finalisé',
+    created_at: '2026-06-05T10:00:00Z'
+  }
+];
+
 // CLIENT SIMULÉ API (GETTER/SETTERS REACTIFS EN MEMOIRE)
 export const mockSupabase = {
   // Session active (simulation)
@@ -871,5 +958,34 @@ export const mockSupabase = {
         : s
     );
     this.updatePropertyStatus(propertyId, 'Occupé');
+  },
+
+  // SALES & TRANSACTIONS
+  getSaleTransactions(): (SaleTransaction & { property: Property })[] {
+    const props = db_properties.filter(p => p.agency_id === this.activeAgencyId);
+    const propMap = new Map(props.map(p => [p.id, p]));
+    return db_sales
+      .filter(s => s.agency_id === this.activeAgencyId)
+      .map(s => ({
+        ...s,
+        property: propMap.get(s.property_id)!
+      }))
+      .filter(s => s.property !== undefined);
+  },
+
+  addSaleTransaction(transaction: Omit<SaleTransaction, 'id' | 'agency_id' | 'commission_amount' | 'net_owner_amount' | 'created_at'>) {
+    const comm = Math.round(transaction.sale_price * 0.10);
+    const net = transaction.sale_price - comm;
+    const newTx: SaleTransaction = {
+      ...transaction,
+      id: `sale-${Math.random().toString(36).substr(2, 9)}`,
+      agency_id: this.activeAgencyId,
+      commission_amount: comm,
+      net_owner_amount: net,
+      created_at: new Date().toISOString()
+    };
+    db_sales.unshift(newTx);
+    this.updatePropertyStatus(transaction.property_id, 'Vendu');
+    return newTx;
   }
 };
