@@ -197,10 +197,54 @@ export default function DashboardPage() {
     }
     return false;
   });
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>(() => {
+    if (typeof window !== 'undefined') {
+      return mockSupabase.getAgencies().length === 0 ? 'signup' : 'login';
+    }
+    return 'login';
+  });
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
+
+  // States pour la création de compte agence (Sign Up)
+  const [signupAgencyName, setSignupAgencyName] = useState('');
+  const [signupCountry, setSignupCountry] = useState("Côte d'Ivoire");
+  const [signupCurrency, setSignupCurrency] = useState('FCFA');
+  const [signupAddress, setSignupAddress] = useState('');
+  const [signupPhone, setSignupPhone] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupFirstName, setSignupFirstName] = useState('');
+  const [signupLastName, setSignupLastName] = useState('');
+  const [signupUserPhone, setSignupUserPhone] = useState('');
+  const [generateDemoData, setGenerateDemoData] = useState(true);
+  const [signupError, setSignupError] = useState<string | null>(null);
+  const [signupLoading, setSignupLoading] = useState(false);
+
+  // Modals et formulaires pour Bailleurs et Locataires
+  const [landlordModalOpen, setLandlordModalOpen] = useState(false);
+  const [tenantModalOpen, setTenantModalOpen] = useState(false);
+
+  const [newLandlord, setNewLandlord] = useState({
+    first_name: '',
+    last_name: '',
+    phone: '',
+    email: '',
+    address: '',
+    bank_details: '',
+    mobile_money_details: ''
+  });
+
+  const [newTenant, setNewTenant] = useState({
+    first_name: '',
+    last_name: '',
+    phone: '',
+    email: '',
+    profession: '',
+    employer: ''
+  });
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,31 +255,107 @@ export default function DashboardPage() {
       const emailLower = loginEmail.trim().toLowerCase();
       const pass = loginPassword.trim();
 
-      if (pass !== 'password' && pass !== 'admin' && pass !== '123456') {
-        setLoginError("Mot de passe incorrect (utilisez 'password')");
+      const agenciesList = mockSupabase.getAgencies();
+      const matchedAgency = agenciesList.find(a => a.email.toLowerCase() === emailLower);
+
+      if (!matchedAgency) {
+        setLoginError("Aucune agence trouvée avec cet email d'administrateur.");
         setLoginLoading(false);
         return;
       }
 
-      if (emailLower === 'admin.babi@immo360.africa') {
-        mockSupabase.setActiveAgency('a1111111-1111-1111-1111-111111111111');
-        setIsAuthenticated(true);
-        sessionStorage.setItem('immo360_authenticated', 'true');
-        sessionStorage.setItem('immo360_user_email', emailLower);
-        reloadData();
-        showToast("Connexion réussie : Bienvenue chez Babi Immo S.A.");
-      } else if (emailLower === 'admin.teranga@immo360.africa') {
-        mockSupabase.setActiveAgency('a2222222-2222-2222-2222-222222222222');
-        setIsAuthenticated(true);
-        sessionStorage.setItem('immo360_authenticated', 'true');
-        sessionStorage.setItem('immo360_user_email', emailLower);
-        reloadData();
-        showToast("Connexion réussie : Bienvenue chez Teranga Agence Luxe");
-      } else {
-        setLoginError("Email non reconnu. Utilisez 'admin.babi@immo360.africa' ou 'admin.teranga@immo360.africa'");
+      if (pass !== 'password' && pass !== 'admin' && pass !== '123456') {
+        setLoginError("Mot de passe incorrect.");
+        setLoginLoading(false);
+        return;
       }
+
+      mockSupabase.setActiveAgency(matchedAgency.id);
+      setIsAuthenticated(true);
+      sessionStorage.setItem('immo360_authenticated', 'true');
+      sessionStorage.setItem('immo360_user_email', emailLower);
+      reloadData();
+      showToast(`Connexion réussie : Bienvenue chez ${matchedAgency.name}`);
       setLoginLoading(false);
     }, 800);
+  };
+
+  const handleSignup = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSignupLoading(true);
+    setSignupError(null);
+
+    setTimeout(() => {
+      const emailLower = signupEmail.trim().toLowerCase();
+
+      const existing = mockSupabase.getAgencies().some(a => a.email.toLowerCase() === emailLower);
+      if (existing) {
+        setSignupError("Cet email d'administrateur est déjà utilisé.");
+        setSignupLoading(false);
+        return;
+      }
+
+      const agencyData = {
+        name: signupAgencyName,
+        logo_url: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=200&q=80',
+        country: signupCountry,
+        currency: signupCurrency,
+        address: signupAddress,
+        phone: signupPhone,
+        email: emailLower
+      };
+
+      const profileData = {
+        email: emailLower,
+        first_name: signupFirstName,
+        last_name: signupLastName,
+        phone: signupUserPhone
+      };
+
+      const result = mockSupabase.registerAgency(agencyData, profileData, generateDemoData);
+
+      mockSupabase.setActiveAgency(result.agency.id);
+      setIsAuthenticated(true);
+      sessionStorage.setItem('immo360_authenticated', 'true');
+      sessionStorage.setItem('immo360_user_email', emailLower);
+      reloadData();
+
+      showToast(`Compte créé avec succès ! Bienvenue.`);
+      setSignupLoading(false);
+    }, 1000);
+  };
+
+  const handleAddLandlordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    mockSupabase.addLandlord(newLandlord);
+    reloadData();
+    setLandlordModalOpen(false);
+    setNewLandlord({
+      first_name: '',
+      last_name: '',
+      phone: '',
+      email: '',
+      address: '',
+      bank_details: '',
+      mobile_money_details: ''
+    });
+    showToast("Propriétaire enregistré avec succès.");
+  };
+
+  const handleAddTenantSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    mockSupabase.addTenant(newTenant);
+    reloadData();
+    setTenantModalOpen(false);
+    setNewTenant({
+      first_name: '',
+      last_name: '',
+      phone: '',
+      email: '',
+      profession: '',
+      employer: ''
+    });
+    showToast("Locataire enregistré avec succès.");
   };
 
   const [logoClicks, setLogoClicks] = useState(0);
@@ -537,124 +657,277 @@ export default function DashboardPage() {
 
         <div className="relative z-10 w-full max-w-md p-6">
           {/* Logo / Title */}
-          <div className="flex flex-col items-center mb-8 text-center animate-fadeIn">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center shadow-2xl shadow-amber-500/20 mb-4">
-              <Building2 className="w-7 h-7 text-slate-950 stroke-[2.5]" />
+          <div className="flex flex-col items-center mb-6 text-center animate-fadeIn">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center shadow-2xl shadow-amber-500/20 mb-3">
+              <Building2 className="w-6 h-6 text-slate-950 stroke-[2.5]" />
             </div>
-            <h1 className="font-title text-2xl font-extrabold text-white tracking-tight">
+            <h1 className="font-title text-xl font-extrabold text-white tracking-tight">
               IMMO<span className="text-amber-500">360</span> AFRIQUE
             </h1>
-            <p className="text-xs text-slate-400 mt-1 uppercase tracking-wider font-mono">Espace de Gestion Professionnel</p>
+            <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wider font-mono">Espace de Gestion Professionnel</p>
           </div>
 
-          {/* Login Card */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden"
-          >
-            <h2 className="text-lg font-bold text-white mb-2">Connexion</h2>
-            <p className="text-xs text-slate-400 mb-6">Accédez au tableau de bord multi-tenant de votre agence immobilière.</p>
+          <AnimatePresence mode="wait">
+            {authMode === 'login' ? (
+              <motion.div 
+                key="login"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden"
+              >
+                <h2 className="text-lg font-bold text-white mb-2">Connexion</h2>
+                <p className="text-xs text-slate-400 mb-6">Accédez au tableau de bord de votre agence immobilière.</p>
 
-            <form onSubmit={handleLogin} className="space-y-4">
-              {loginError && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2"
-                >
-                  <XCircle className="w-4 h-4 shrink-0" />
-                  <span>{loginError}</span>
-                </motion.div>
-              )}
-
-              <div>
-                <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Adresse Email</label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-3.5 w-4 h-4 text-slate-500" />
-                  <input
-                    type="email"
-                    required
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="admin.babi@immo360.africa"
-                    className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-11 pr-4 py-2.5 text-xs text-white focus:outline-none transition-all font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Mot de passe</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-3.5 w-4 h-4 text-slate-500" />
-                  <input
-                    type="password"
-                    required
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-11 pr-4 py-2.5 text-xs text-white focus:outline-none transition-all font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={loginLoading}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:from-slate-800 disabled:to-slate-800 text-slate-950 disabled:text-slate-500 font-bold text-xs shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer border-none"
-                >
-                  {loginLoading ? (
-                    <div className="w-4 h-4 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
-                  ) : (
-                    <span>Se connecter</span>
+                <form onSubmit={handleLogin} className="space-y-4 text-left">
+                  {loginError && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2"
+                    >
+                      <XCircle className="w-4 h-4 shrink-0" />
+                      <span>{loginError}</span>
+                    </motion.div>
                   )}
-                </button>
-              </div>
-            </form>
-          </motion.div>
 
-          {/* Accounts Demo helper card */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="mt-6 p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10 text-slate-400 text-xs space-y-3"
-          >
-            <div className="flex items-center gap-2 text-amber-500 font-bold uppercase tracking-wider text-[10px]">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Accès Démo Interactif</span>
-            </div>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              Pour des raisons de test, connectez-vous avec l'un des comptes préconfigurés :
-            </p>
-            <div className="space-y-1.5 font-mono text-[10px] text-slate-350">
-              <div 
-                className="p-2 bg-slate-950/40 border border-slate-900 rounded-lg hover:border-amber-500/30 cursor-pointer transition-colors"
-                onClick={() => {
-                  setLoginEmail('admin.babi@immo360.africa');
-                  setLoginPassword('password');
-                }}
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Adresse Email Administrateur</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-3.5 w-4 h-4 text-slate-500" />
+                      <input
+                        type="email"
+                        required
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        placeholder="admin@monagence.com"
+                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-11 pr-4 py-2.5 text-xs text-white focus:outline-none transition-all font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Mot de passe</label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-3.5 w-4 h-4 text-slate-500" />
+                      <input
+                        type="password"
+                        required
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-11 pr-4 py-2.5 text-xs text-white focus:outline-none transition-all font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={loginLoading}
+                      className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:from-slate-800 disabled:to-slate-800 text-slate-950 disabled:text-slate-500 font-bold text-xs shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer border-none"
+                    >
+                      {loginLoading ? (
+                        <div className="w-4 h-4 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
+                      ) : (
+                        <span>Se connecter</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+
+                <div className="text-center mt-6">
+                  <button 
+                    onClick={() => setAuthMode('signup')}
+                    className="text-xs text-slate-450 hover:text-slate-350 transition-colors underline underline-offset-4 cursor-pointer"
+                  >
+                    Créer un compte d'agence
+                  </button>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="signup"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden"
               >
-                <div className="font-bold text-amber-450 text-[9px] uppercase tracking-wider">🇨🇮 Babi Immo S.A. (Abidjan)</div>
-                <div>Email : <span className="text-white select-all">admin.babi@immo360.africa</span></div>
-              </div>
-              
-              <div 
-                className="p-2 bg-slate-950/40 border border-slate-900 rounded-lg hover:border-amber-500/30 cursor-pointer transition-colors"
-                onClick={() => {
-                  setLoginEmail('admin.teranga@immo360.africa');
-                  setLoginPassword('password');
-                }}
-              >
-                <div className="font-bold text-amber-450 text-[9px] uppercase tracking-wider">🇸🇳 Teranga Agence (Dakar)</div>
-                <div>Email : <span className="text-white select-all">admin.teranga@immo360.africa</span></div>
-              </div>
-              <div className="text-[9px] text-slate-500 text-center pt-1 italic">
-                Mot de passe pour les deux comptes : <span className="text-white font-bold select-all">password</span> (ou cliquez sur un compte ci-dessus)
-              </div>
-            </div>
-          </motion.div>
+                <h2 className="text-lg font-bold text-white mb-2">Créer un compte d'agence</h2>
+                <p className="text-xs text-slate-400 mb-6">Enregistrez votre agence de gestion immobilière en 2 minutes.</p>
+
+                <form onSubmit={handleSignup} className="space-y-4 text-left">
+                  {signupError && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2"
+                    >
+                      <XCircle className="w-4 h-4 shrink-0" />
+                      <span>{signupError}</span>
+                    </motion.div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Nom de l'agence *</label>
+                      <input
+                        type="text"
+                        required
+                        value={signupAgencyName}
+                        onChange={(e) => setSignupAgencyName(e.target.value)}
+                        placeholder="Ex: Kafana Gestion"
+                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Pays *</label>
+                      <select
+                        value={signupCountry}
+                        onChange={(e) => {
+                          setSignupCountry(e.target.value);
+                          setSignupCurrency(e.target.value === 'Sénégal' || e.target.value === "Côte d'Ivoire" ? 'FCFA' : 'EUR');
+                        }}
+                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all cursor-pointer"
+                      >
+                        <option value="Côte d'Ivoire">Côte d'Ivoire 🇨🇮</option>
+                        <option value="Sénégal">Sénégal 🇸🇳</option>
+                        <option value="Cameroun">Cameroun 🇨🇲</option>
+                        <option value="Gabon">Gabon 🇬🇦</option>
+                        <option value="France">France 🇫🇷</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Devise</label>
+                      <select
+                        value={signupCurrency}
+                        onChange={(e) => setSignupCurrency(e.target.value)}
+                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all cursor-pointer"
+                      >
+                        <option value="FCFA">FCFA (XOF/XAF)</option>
+                        <option value="EUR">Euro (€)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Téléphone Agence</label>
+                      <input
+                        type="text"
+                        value={signupPhone}
+                        onChange={(e) => setSignupPhone(e.target.value)}
+                        placeholder="Ex: +225 07..."
+                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Adresse Physique</label>
+                    <input
+                      type="text"
+                      value={signupAddress}
+                      onChange={(e) => setSignupAddress(e.target.value)}
+                      placeholder="Ex: Boulevard Hassan II, Dakar"
+                      className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all"
+                    />
+                  </div>
+
+                  <div className="border-t border-slate-800 pt-3 my-1">
+                    <span className="text-[10px] font-bold text-amber-500 block mb-2 uppercase tracking-wider">Compte Administrateur</span>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1 font-medium">Prénom *</label>
+                        <input
+                          type="text"
+                          required
+                          value={signupFirstName}
+                          onChange={(e) => setSignupFirstName(e.target.value)}
+                          placeholder="Jean"
+                          className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1 font-medium">Nom *</label>
+                        <input
+                          type="text"
+                          required
+                          value={signupLastName}
+                          onChange={(e) => setSignupLastName(e.target.value)}
+                          placeholder="Koffi"
+                          className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1.5 font-medium">Email *</label>
+                      <input
+                        type="email"
+                        required
+                        value={signupEmail}
+                        onChange={(e) => setSignupEmail(e.target.value)}
+                        placeholder="admin@monagence.com"
+                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1.5 font-medium">Mot de passe *</label>
+                      <input
+                        type="password"
+                        required
+                        value={signupPassword}
+                        onChange={(e) => setSignupPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <input
+                      type="checkbox"
+                      id="generateDemoData"
+                      checked={generateDemoData}
+                      onChange={(e) => setGenerateDemoData(e.target.checked)}
+                      className="rounded border-slate-800 bg-slate-950 text-amber-500 focus:ring-amber-500 h-4 w-4 cursor-pointer"
+                    />
+                    <label htmlFor="generateDemoData" className="text-[11px] text-slate-300 select-none cursor-pointer">
+                      Pré-remplir l'agence avec des données de démo (biens, locataires, baux)
+                    </label>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={signupLoading}
+                      className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:from-slate-800 disabled:to-slate-800 text-slate-950 disabled:text-slate-500 font-bold text-xs shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer border-none"
+                    >
+                      {signupLoading ? (
+                        <div className="w-4 h-4 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
+                      ) : (
+                        <span>Créer mon compte & Accéder</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+
+                {mockSupabase.getAgencies().length > 0 && (
+                  <div className="text-center mt-6">
+                    <button 
+                      onClick={() => setAuthMode('login')}
+                      className="text-xs text-slate-450 hover:text-slate-350 transition-colors underline underline-offset-4 cursor-pointer"
+                    >
+                      Déjà inscrit ? Se connecter
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Back to Home link */}
           <div className="text-center mt-6">
@@ -1673,9 +1946,18 @@ export default function DashboardPage() {
           {/* GESTION DES BAILLEURS (LANDLORDS) */}
           {activeMenu === 'landlords' && (
             <div className="space-y-6">
-              <div>
-                <h1 className="font-title text-2xl font-extrabold text-slate-900">Bailleurs & Propriétaires</h1>
-                <p className="text-xs text-slate-500">Gérez vos mandats de gestion et les coordonnées des propriétaires de vos biens.</p>
+              <div className="flex justify-between items-center text-left">
+                <div>
+                  <h1 className="font-title text-2xl font-extrabold text-slate-900">Bailleurs & Propriétaires</h1>
+                  <p className="text-xs text-slate-500">Gérez vos mandats de gestion et les coordonnées des propriétaires de vos biens.</p>
+                </div>
+                <button
+                  onClick={() => setLandlordModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition-all cursor-pointer border-none"
+                >
+                  <Plus className="w-4 h-4 text-amber-500 stroke-[3]" />
+                  Ajouter un Propriétaire
+                </button>
               </div>
 
               <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden text-left">
@@ -1711,9 +1993,18 @@ export default function DashboardPage() {
           {/* GESTION DES LOCATAIRES (TENANTS) */}
           {activeMenu === 'tenants' && (
             <div className="space-y-6">
-              <div>
-                <h1 className="font-title text-2xl font-extrabold text-slate-900">Annuaire des Locataires</h1>
-                <p className="text-xs text-slate-500">Accédez aux profils des locataires, professions, employeurs et pièces d'identité.</p>
+              <div className="flex justify-between items-center text-left">
+                <div>
+                  <h1 className="font-title text-2xl font-extrabold text-slate-900">Annuaire des Locataires</h1>
+                  <p className="text-xs text-slate-500">Accédez aux profils des locataires, professions, employeurs et pièces d'identité.</p>
+                </div>
+                <button
+                  onClick={() => setTenantModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition-all cursor-pointer border-none"
+                >
+                  <Plus className="w-4 h-4 text-amber-500 stroke-[3]" />
+                  Ajouter un Locataire
+                </button>
               </div>
 
               <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden text-left">
@@ -4263,6 +4554,246 @@ export default function DashboardPage() {
                     className="w-1/2 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-lg cursor-pointer"
                   >
                     Valider la Vente
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: AJOUTER UN PROPRIÉTAIRE */}
+      <AnimatePresence>
+        {landlordModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 animate-fadeIn">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setLandlordModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl border border-slate-200 shadow-2xl p-8 max-w-md w-full relative z-10 text-left overflow-y-auto max-h-[85vh]"
+            >
+              <h3 className="font-title text-lg font-bold text-slate-900 mb-2">Nouveau Propriétaire / Mandant</h3>
+              <p className="text-xs text-slate-400 mb-6">Ajoutez les coordonnées d'un propriétaire pour lui affecter des mandats de gestion et lui verser ses loyers.</p>
+
+              <form onSubmit={handleAddLandlordSubmit} className="space-y-4 text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-medium">Nom *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newLandlord.last_name}
+                      onChange={(e) => setNewLandlord({ ...newLandlord, last_name: e.target.value })}
+                      placeholder="Ex: Koné"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-medium">Prénom *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newLandlord.first_name}
+                      onChange={(e) => setNewLandlord({ ...newLandlord, first_name: e.target.value })}
+                      placeholder="Ex: Amadou"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-medium">Téléphone *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newLandlord.phone}
+                    onChange={(e) => setNewLandlord({ ...newLandlord, phone: e.target.value })}
+                    placeholder="Ex: +225 07 89 01 23 45"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-medium">Adresse Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={newLandlord.email}
+                    onChange={(e) => setNewLandlord({ ...newLandlord, email: e.target.value })}
+                    placeholder="Ex: amadou.kone@gmail.com"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-medium">Adresse Physique</label>
+                  <input
+                    type="text"
+                    value={newLandlord.address}
+                    onChange={(e) => setNewLandlord({ ...newLandlord, address: e.target.value })}
+                    placeholder="Ex: Cocody Les Deux Plateaux, Abidjan"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-medium">Coordonnées Bancaires (RIB / IBAN)</label>
+                  <input
+                    type="text"
+                    value={newLandlord.bank_details}
+                    onChange={(e) => setNewLandlord({ ...newLandlord, bank_details: e.target.value })}
+                    placeholder="Ex: RIB SGCI CI008 01202 98765432109 88"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none font-mono text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-medium">Compte Mobile Money pour versement (Wave, OM, etc.)</label>
+                  <input
+                    type="text"
+                    value={newLandlord.mobile_money_details}
+                    onChange={(e) => setNewLandlord({ ...newLandlord, mobile_money_details: e.target.value })}
+                    placeholder="Ex: Wave: +225 07 89 01 23 45"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none text-xs"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setLandlordModalOpen(false)}
+                    className="w-1/2 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 font-semibold text-xs text-center cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="w-1/2 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-lg cursor-pointer"
+                  >
+                    Enregistrer
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: AJOUTER UN LOCATAIRE */}
+      <AnimatePresence>
+        {tenantModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 animate-fadeIn">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setTenantModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl border border-slate-200 shadow-2xl p-8 max-w-md w-full relative z-10 text-left overflow-y-auto max-h-[85vh]"
+            >
+              <h3 className="font-title text-lg font-bold text-slate-900 mb-2">Nouveau Locataire</h3>
+              <p className="text-xs text-slate-400 mb-6">Ajoutez les coordonnées d'un nouveau locataire dans votre annuaire.</p>
+
+              <form onSubmit={handleAddTenantSubmit} className="space-y-4 text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-medium">Nom *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newTenant.last_name}
+                      onChange={(e) => setNewTenant({ ...newTenant, last_name: e.target.value })}
+                      placeholder="Ex: Kouassi"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-medium">Prénom *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newTenant.first_name}
+                      onChange={(e) => setNewTenant({ ...newTenant, first_name: e.target.value })}
+                      placeholder="Ex: Koffi"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-medium">Téléphone *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newTenant.phone}
+                    onChange={(e) => setNewTenant({ ...newTenant, phone: e.target.value })}
+                    placeholder="Ex: +225 07 45 45 45 45"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-medium">Adresse Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={newTenant.email}
+                    onChange={(e) => setNewTenant({ ...newTenant, email: e.target.value })}
+                    placeholder="Ex: koffi.kouassi@gmail.com"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-medium">Profession</label>
+                    <input
+                      type="text"
+                      value={newTenant.profession}
+                      onChange={(e) => setNewTenant({ ...newTenant, profession: e.target.value })}
+                      placeholder="Ex: Ingénieur UX"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-medium">Employeur</label>
+                    <input
+                      type="text"
+                      value={newTenant.employer}
+                      onChange={(e) => setNewTenant({ ...newTenant, employer: e.target.value })}
+                      placeholder="Ex: UNICEF"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setTenantModalOpen(false)}
+                    className="w-1/2 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 font-semibold text-xs text-center cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="w-1/2 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-lg cursor-pointer"
+                  >
+                    Enregistrer
                   </button>
                 </div>
               </form>

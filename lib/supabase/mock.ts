@@ -164,562 +164,24 @@ export interface SaleTransaction {
   created_at: string;
 }
 
-// Données en mémoire (chargées avec les données seed)
-let db_agencies: Agency[] = [
-  {
-    id: 'a1111111-1111-1111-1111-111111111111',
-    name: 'Babi Immo S.A.',
-    logo_url: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=200&q=80',
-    country: 'Côte d\'Ivoire',
-    currency: 'FCFA',
-    address: 'Boulevard Latrille, Cocody, Abidjan',
-    phone: '+225 07 00 00 00 01',
-    email: 'contact@babi-immo.ci',
-    plan: 'Standard',
-    status: 'Actif'
-  },
-  {
-    id: 'a2222222-2222-2222-2222-222222222222',
-    name: 'Teranga Agence Luxe',
-    logo_url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=200&q=80',
-    country: 'Sénégal',
-    currency: 'FCFA',
-    address: 'Route des Almadies, Dakar',
-    phone: '+221 33 800 00 01',
-    email: 'luxe@terangaimmo.sn',
-    plan: 'Premium',
-    status: 'Actif'
-  }
-];
-
-let db_profiles: Profile[] = [
-  {
-    id: 'u1111111-1111-1111-1111-111111111111',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    email: 'admin.babi@immo360.africa',
-    first_name: 'Jean-Philippe',
-    last_name: 'Koffi',
-    phone: '+225 05 55 55 55 55',
-    role: 'agency_admin'
-  },
-  {
-    id: 'u2222221-2222-2222-2222-222222222221',
-    agency_id: 'a2222222-2222-2222-2222-222222222222',
-    email: 'admin.teranga@immo360.africa',
-    first_name: 'Moustapha',
-    last_name: 'Ndiaye',
-    phone: '+221 77 123 45 67',
-    role: 'agency_admin'
-  }
-];
-
-let db_landlords: Landlord[] = [
-  {
-    id: 'l1111111-1111-1111-1111-111111111111',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    first_name: 'Amadou',
-    last_name: 'Koné',
-    email: 'amadou.kone@yahoo.ci',
-    phone: '+225 07 89 01 23 45',
-    address: 'Cocody Les Deux Plateaux, Abidjan',
-    bank_details: 'RIB SIB CI056 01101 12345678901 22',
-    mobile_money_details: 'Orange Money: +225 07 89 01 23 45'
-  },
-  {
-    id: 'l1111112-1111-1111-1111-111111111112',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    first_name: 'Chantal',
-    last_name: 'Boni',
-    email: 'chantal.boni@gmail.com',
-    phone: '+225 05 12 34 56 78',
-    address: 'Zone 4, Marcory, Abidjan',
-    bank_details: 'RIB SGCI CI008 01202 98765432109 88',
-    mobile_money_details: 'Wave: +225 05 12 34 56 78'
-  },
-  {
-    id: 'l2222221-2222-2222-2222-222222222221',
-    agency_id: 'a2222222-2222-2222-2222-222222222222',
-    first_name: 'Fatou',
-    last_name: 'Sow',
-    email: 'fatou.sow@orange.sn',
-    phone: '+221 77 654 32 10',
-    address: 'Point E, Dakar',
-    bank_details: 'RIB CBAO SN012 01001 00223344556 77',
-    mobile_money_details: 'Wave: +221 77 654 32 10'
-  }
-];
-
-let db_properties: Property[] = [
-  {
-    id: 'p1111111-1111-1111-1111-111111111111',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    name: 'Villa Prestige Cocody',
-    type: 'Villa',
-    status: 'Occupé',
-    address: 'Rue des Jardins, Cocody Deux-Plateaux',
-    city: 'Abidjan',
-    country: 'Côte d\'Ivoire',
-    description: 'Magnifique villa duplex de 5 pièces avec piscine, jardin paysager, garage 2 véhicules, portail électrique et sécurité H24.',
-    surface: 350.0,
-    rooms: 5,
-    rental_value: 1500000,
-    gallery: ['https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80'],
-    listing_type: 'Location'
-  },
-  {
-    id: 'p1111112-1111-1111-1111-111111111112',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    name: 'Appartement Chic Zone 4',
-    type: 'Appartement',
-    status: 'Occupé',
-    address: 'Rue Paul Langevin, Zone 4C, Marcory',
-    city: 'Abidjan',
-    country: 'Côte d\'Ivoire',
-    description: 'Appartement F3 haut standing meublé dans un immeuble récent avec ascenseur, groupe électrogène, salle de sport commune et conciergerie.',
-    surface: 120.0,
-    rooms: 3,
-    rental_value: 850000,
-    gallery: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80'],
-    listing_type: 'Location'
-  },
-  {
-    id: 'p1111113-1111-1111-1111-111111111113',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    name: 'Bureaux d\'Affaires Plateau',
-    type: 'Bureau',
-    status: 'Disponible',
-    address: 'Avenue Nogues, Plateau',
-    city: 'Abidjan',
-    country: 'Côte d\'Ivoire',
-    description: 'Plateau de bureaux cloisonné de 250m2, câblage réseau complet, climatisation centrale, parfait pour siège social ou agence.',
-    surface: 250.0,
-    rooms: 6,
-    rental_value: 2500000,
-    gallery: ['https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80'],
-    listing_type: 'Location'
-  },
-  {
-    id: 'p1111114-1111-1111-1111-111111111114',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    name: 'Villa Sociale Abobo',
-    type: 'Villa',
-    status: 'Occupé',
-    address: 'Quartier Avocatier, Abobo',
-    city: 'Abidjan',
-    country: 'Côte d\'Ivoire',
-    description: 'Villa basse de 3 pièces dans le cadre du programme de logements sociaux. Loyer modéré réglementé.',
-    surface: 75.0,
-    rooms: 3,
-    rental_value: 120000,
-    gallery: ['https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80'],
-    listing_type: 'Location'
-  },
-  {
-    id: 'p1111115-1111-1111-1111-111111111115',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    name: 'Terrain Cocody Angré',
-    type: 'Terrain',
-    status: 'Disponible',
-    address: 'Près du CHU d\'Angré, Cocody',
-    city: 'Abidjan',
-    country: 'Côte d\'Ivoire',
-    description: 'Superbe lotissement de 500m2 approuvé avec ACD, prêt pour construction immédiate dans une zone hautement résidentielle.',
-    surface: 500.0,
-    rooms: 0,
-    rental_value: 45000000,
-    gallery: ['https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80'],
-    listing_type: 'Vente'
-  },
-  {
-    id: 'p1111116-1111-1111-1111-111111111116',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    name: 'Terrain Zone Ind. Yopougon',
-    type: 'Terrain',
-    status: 'Vendu',
-    address: 'Zone Industrielle, Yopougon',
-    city: 'Abidjan',
-    country: 'Côte d\'Ivoire',
-    description: 'Terrain commercial clôturé de 1000m2 avec accès route bitumée, idéal pour entrepôt ou usine.',
-    surface: 1000.0,
-    rooms: 0,
-    rental_value: 30000000,
-    gallery: ['https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80'],
-    listing_type: 'Vente'
-  },
-  {
-    id: 'p2222221-2222-2222-2222-222222222221',
-    agency_id: 'a2222222-2222-2222-2222-222222222222',
-    name: 'Penthouse Almadies Ocean View',
-    type: 'Appartement',
-    status: 'Occupé',
-    address: 'Corniche Ouest, Les Almadies',
-    city: 'Dakar',
-    country: 'Sénégal',
-    description: 'Penthouse exceptionnel de 4 pièces avec vue panoramique sur l\'Océan Atlantique, piscine privée suspendue sur la terrasse, finitions marbre.',
-    surface: 280.0,
-    rooms: 4,
-    rental_value: 3000000,
-    gallery: ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80'],
-    listing_type: 'Location'
-  },
-  {
-    id: 'p2222222-2222-2222-2222-222222222222',
-    agency_id: 'a2222222-2222-2222-2222-222222222222',
-    name: 'Magasin Commercial Dakar Plateau',
-    type: 'Magasin',
-    status: 'En maintenance',
-    address: 'Avenue Léopold Sédar Senghor, Plateau',
-    city: 'Dakar',
-    country: 'Sénégal',
-    description: 'Local commercial en rez-de-chaussée avec une grande vitrine passante, excellent emplacement commercial.',
-    surface: 90.0,
-    rooms: 2,
-    rental_value: 1200000,
-    gallery: ['https://images.unsplash.com/photo-1555529669-e69e7aa0db9a?auto=format&fit=crop&w=800&q=80'],
-    listing_type: 'Location'
-  },
-  {
-    id: 'p2222223-2222-2222-2222-222222222223',
-    agency_id: 'a2222222-2222-2222-2222-222222222222',
-    name: 'Maison Prestige Almadies',
-    type: 'Villa',
-    status: 'Disponible',
-    address: 'Zone résidentielle, Les Almadies',
-    city: 'Dakar',
-    country: 'Sénégal',
-    description: 'Somptueuse demeure contemporaine de 7 pièces, grand jardin arboré, piscine olympique et quartier diplomatique sécurisé.',
-    surface: 600.0,
-    rooms: 7,
-    rental_value: 120000000,
-    gallery: ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80'],
-    listing_type: 'Vente'
-  }
-];
-
-let db_tenants: Tenant[] = [
-  {
-    id: 't1111111-1111-1111-1111-111111111111',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    first_name: 'Koffi',
-    last_name: 'Kouassi',
-    email: 'koffi.kouassi@unicef.org',
-    phone: '+225 07 45 45 45 45',
-    profession: 'Chargé de Mission UX',
-    employer: 'UNICEF Côte d\'Ivoire'
-  },
-  {
-    id: 't1111112-1111-1111-1111-111111111112',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    first_name: 'Marie-Estelle',
-    last_name: 'Ouedraogo',
-    email: 'marie.estelle@ecobank.com',
-    phone: '+225 05 88 99 00 11',
-    profession: 'Directrice Risques',
-    employer: 'Ecobank CI'
-  },
-  {
-    id: 't2222221-2222-2222-2222-222222222221',
-    agency_id: 'a2222222-2222-2222-2222-222222222222',
-    first_name: 'Cheikh',
-    last_name: 'Gueye',
-    email: 'cheikh.gueye@tigo.sn',
-    phone: '+221 76 800 11 22',
-    profession: 'Ingénieur Réseaux',
-    employer: 'Free Sénégal'
-  }
-];
-
-let db_leases: Lease[] = [
-  {
-    id: 'b1111111-1111-1111-1111-111111111111',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    property_id: 'p1111111-1111-1111-1111-111111111111',
-    tenant_id: 't1111111-1111-1111-1111-111111111111',
-    type: 'Habitation',
-    start_date: '2025-01-01',
-    end_date: '2026-12-31',
-    rent_amount: 1500000,
-    deposit_amount: 3000000,
-    advance_months: 3,
-    charges_amount: 150000,
-    payment_day: 5,
-    status: 'Actif',
-    signature_url: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=400&q=80',
-    pdf_url: '/documents/lease_presite_cocody.pdf'
-  },
-  {
-    id: 'b1111112-1111-1111-1111-111111111112',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    property_id: 'p1111112-1111-1111-1111-111111111112',
-    tenant_id: 't1111112-1111-1111-1111-111111111112',
-    type: 'Habitation',
-    start_date: '2025-06-01',
-    end_date: '2026-05-31',
-    rent_amount: 850000,
-    deposit_amount: 1700000,
-    advance_months: 2,
-    charges_amount: 50000,
-    payment_day: 5,
-    status: 'Actif',
-    signature_url: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=400&q=80',
-    pdf_url: '/documents/lease_appartement_zone4.pdf'
-  },
-  {
-    id: 'b2222221-2222-2222-2222-222222222221',
-    agency_id: 'a2222222-2222-2222-2222-222222222222',
-    property_id: 'p2222221-2222-2222-2222-222222222221',
-    tenant_id: 't2222221-2222-2222-2222-222222222221',
-    type: 'Habitation',
-    start_date: '2025-03-01',
-    end_date: '2027-02-28',
-    rent_amount: 3000000,
-    deposit_amount: 6000000,
-    advance_months: 3,
-    charges_amount: 200000,
-    payment_day: 5,
-    status: 'Actif',
-    signature_url: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=400&q=80',
-    pdf_url: '/documents/lease_penthouse_almadies.pdf'
-  }
-];
-
-let db_payments: Payment[] = [
-  // Villa Cocody (Total: 1 650 000 FCFA)
-  {
-    id: 'm1111111-1111-1111-1111-111111111111',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    lease_id: 'b1111111-1111-1111-1111-111111111111',
-    amount: 1650000,
-    period_start: '2026-04-01',
-    period_end: '2026-04-30',
-    payment_date: '2026-04-04T10:30:00Z',
-    status: 'Payé',
-    method: 'Virement',
-    reference: 'VR-SIB-09871'
-  },
-  {
-    id: 'm1111112-1111-1111-1111-111111111112',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    lease_id: 'b1111111-1111-1111-1111-111111111111',
-    amount: 1650000,
-    period_start: '2026-05-01',
-    period_end: '2026-05-30',
-    payment_date: '2026-05-05T14:15:00Z',
-    status: 'Payé',
-    method: 'Virement',
-    reference: 'VR-SIB-11402'
-  },
-  {
-    id: 'm1111113-1111-1111-1111-111111111113',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    lease_id: 'b1111111-1111-1111-1111-111111111111',
-    amount: 1650000,
-    period_start: '2026-06-01',
-    period_end: '2026-06-30',
-    status: 'En retard'
-  },
-  // Appartement Zone 4 (Total: 900 000 FCFA)
-  {
-    id: 'm1111114-1111-1111-1111-111111111114',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    lease_id: 'b1111112-1111-1111-1111-111111111112',
-    amount: 900000,
-    period_start: '2026-04-01',
-    period_end: '2026-04-30',
-    payment_date: '2026-04-05T09:00:00Z',
-    status: 'Payé',
-    method: 'Orange Money',
-    reference: 'OM-260405-900K'
-  },
-  {
-    id: 'm1111115-1111-1111-1111-111111111115',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    lease_id: 'b1111112-1111-1111-1111-111111111112',
-    amount: 900000,
-    period_start: '2026-05-01',
-    period_end: '2026-05-30',
-    payment_date: '2026-05-04T16:45:00Z',
-    status: 'Payé',
-    method: 'Wave',
-    reference: 'WV-260504-8742'
-  },
-  {
-    id: 'm1111116-1111-1111-1111-111111111116',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    lease_id: 'b1111112-1111-1111-1111-111111111112',
-    amount: 900000,
-    period_start: '2026-06-01',
-    period_end: '2026-06-30',
-    payment_date: '2026-06-03T11:20:00Z',
-    status: 'Payé',
-    method: 'Wave',
-    reference: 'WV-260603-9041'
-  },
-  // Penthouse Almadies (Total: 3 200 000 FCFA)
-  {
-    id: 'm2222221-2222-2222-2222-222222222221',
-    agency_id: 'a2222222-2222-2222-2222-222222222222',
-    lease_id: 'b2222221-2222-2222-2222-222222222221',
-    amount: 3200000,
-    period_start: '2026-06-01',
-    period_end: '2026-06-30',
-    payment_date: '2026-06-02T08:30:00Z',
-    status: 'Payé',
-    method: 'Virement',
-    reference: 'VR-CBAO-6721'
-  }
-];
-
-let db_receipts: Receipt[] = [
-  {
-    id: 'q1111111-1111-1111-1111-111111111111',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    payment_id: 'm1111111-1111-1111-1111-111111111111',
-    receipt_number: 'Q-2026-04-0001',
-    pdf_url: '/documents/quittance_q-2026-04-0001.pdf',
-    sent_at: '2026-04-04T11:00:00Z',
-    sent_via: ['Email', 'WhatsApp']
-  },
-  {
-    id: 'q1111112-1111-1111-1111-111111111112',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    payment_id: 'm1111112-1111-1111-1111-111111111112',
-    receipt_number: 'Q-2026-05-0001',
-    pdf_url: '/documents/quittance_q-2026-05-0001.pdf',
-    sent_at: '2026-05-05T14:30:00Z',
-    sent_via: ['Email']
-  },
-  {
-    id: 'q1111113-1111-1111-1111-111111111113',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    payment_id: 'm1111116-1111-1111-1111-111111111116',
-    receipt_number: 'Q-2026-06-0002',
-    pdf_url: '/documents/quittance_q-2026-06-0002.pdf',
-    sent_at: '2026-06-03T12:00:00Z',
-    sent_via: ['WhatsApp']
-  }
-];
-
-let db_maintenance_tickets: MaintenanceTicket[] = [
-  {
-    id: 't1111111-2222-3333-4444-555555555555',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    property_id: 'p1111111-1111-1111-1111-111111111111',
-    title: 'Fuite climatiseur salon',
-    description: 'L\'unité de climatisation du grand salon coule le long du mur en créant des traces d\'humidité.',
-    status: 'En cours',
-    priority: 'Moyenne',
-    contractor_name: 'Sékou Plomberie-Clim',
-    contractor_phone: '+225 07 12 12 12 12',
-    cost: 45000,
-    created_at: '2026-06-01T09:00:00Z'
-  },
-  {
-    id: 't2222222-3333-4444-5555-666666666666',
-    agency_id: 'a2222222-2222-2222-2222-222222222222',
-    property_id: 'p2222222-2222-2222-2222-222222222222',
-    title: 'Rénovation vitrine commerce',
-    description: 'Remplacement des montants en aluminium et changement du vitrage fissuré.',
-    status: 'Assigné',
-    priority: 'Haute',
-    contractor_name: 'Dakar Alu & Design',
-    contractor_phone: '+221 77 444 33 22',
-    cost: 450000,
-    created_at: '2026-06-05T15:30:00Z'
-  }
-];
-
-let db_crm_leads: CRMLead[] = [
-  {
-    id: 'c1111111-1111-1111-1111-111111111111',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    first_name: 'Désiré',
-    last_name: 'N\'Guessan',
-    phone: '+225 01 02 03 04 05',
-    email: 'desire.nguessan@gmail.com',
-    interest_type: 'Achat',
-    budget: 75000000,
-    status: 'Qualifié',
-    notes: 'Recherche un appartement de 3 ou 4 pièces à Cocody-Angré, budget max 75 millions. Préfère résidence fermée.',
-    created_at: '2026-05-15T10:00:00Z'
-  },
-  {
-    id: 'c1111112-1111-1111-1111-111111111112',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    first_name: 'Kadiatou',
-    last_name: 'Sangaré',
-    phone: '+225 05 06 07 08 09',
-    email: 'kadi.sangare@live.fr',
-    interest_type: 'Location',
-    budget: 500000,
-    status: 'Nouveau',
-    notes: 'Recherche studio ou F2 sur Marcory / Zone 4, meublé ou non. Entrée prévue début Juillet.',
-    created_at: '2026-06-08T11:20:00Z'
-  },
-  {
-    id: 'c2222221-2222-2222-2222-222222222221',
-    agency_id: 'a2222222-2222-2222-2222-222222222222',
-    first_name: 'Ousmane',
-    last_name: 'Faye',
-    phone: '+221 78 999 88 77',
-    email: 'ousmane.faye@invest-sn.com',
-    interest_type: 'Investissement',
-    budget: 150000000,
-    status: 'Proposition',
-    notes: 'Client résidant en France. Souhaite acheter un immeuble de rapport ou plusieurs appartements sur Dakar Plateau ou Mermoz.',
-    created_at: '2026-05-20T14:40:00Z'
-  }
-];
-
-let db_social_housing: SocialHousingApplication[] = [
-  {
-    id: 's1111111-1111-1111-1111-111111111111',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    beneficiary_first_name: 'Bakary',
-    beneficiary_last_name: 'Konaté',
-    beneficiary_national_id: 'CI012345678',
-    beneficiary_phone: '+225 05 76 54 32 10',
-    monthly_income: 180000,
-    family_size: 5,
-    eligibility_status: 'Éligible',
-    created_at: '2026-05-10T08:30:00Z'
-  },
-  {
-    id: 's1111112-1111-1111-1111-111111111112',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    beneficiary_first_name: 'Yasmine',
-    beneficiary_last_name: 'Gnakpa',
-    beneficiary_national_id: 'CI987654321',
-    beneficiary_phone: '+225 07 11 22 33 44',
-    monthly_income: 320000,
-    family_size: 2,
-    eligibility_status: 'Attribué',
-    attributed_property_id: 'p1111114-1111-1111-1111-111111111114',
-    created_at: '2026-06-02T10:15:00Z'
-  }
-];
-
-let db_sales: SaleTransaction[] = [
-  {
-    id: 's1111111-2222-3333-4444-555555555555',
-    agency_id: 'a1111111-1111-1111-1111-111111111111',
-    property_id: 'p1111116-1111-1111-1111-111111111116',
-    buyer_name: 'Kouadio N\'Goran',
-    buyer_phone: '+225 07 11 22 33 44',
-    sale_price: 30000000,
-    commission_amount: 3000000,
-    net_owner_amount: 27000000,
-    payment_method: 'Virement',
-    reference: 'VR-SGCI-88123',
-    status: 'Finalisé',
-    created_at: '2026-06-05T10:00:00Z'
-  }
-];
+// Données en mémoire initialisées vides (plus de comptes d'essai préchargés)
+let db_agencies: Agency[] = [];
+let db_profiles: Profile[] = [];
+let db_landlords: Landlord[] = [];
+let db_properties: Property[] = [];
+let db_tenants: Tenant[] = [];
+let db_leases: Lease[] = [];
+let db_payments: Payment[] = [];
+let db_receipts: Receipt[] = [];
+let db_maintenance_tickets: MaintenanceTicket[] = [];
+let db_crm_leads: CRMLead[] = [];
+let db_social_housing: SocialHousingApplication[] = [];
+let db_sales: SaleTransaction[] = [];
 
 // CLIENT SIMULÉ API (GETTER/SETTERS REACTIFS EN MEMOIRE)
 export const mockSupabase = {
   // Session active (simulation)
-  activeAgencyId: 'a1111111-1111-1111-1111-111111111111', // Babi Immo par défaut
+  activeAgencyId: '',
   
   setActiveAgency(agencyId: string) {
     this.activeAgencyId = agencyId;
@@ -728,8 +190,219 @@ export const mockSupabase = {
     }
   },
 
+  registerAgency(agency: Omit<Agency, 'id'>, profile: Omit<Profile, 'id' | 'agency_id' | 'role'>, generateDemoData: boolean) {
+    const newAgency: Agency = {
+      ...agency,
+      id: `a-${Math.random().toString(36).substr(2, 9)}`,
+      plan: 'Standard',
+      status: 'Actif'
+    };
+    db_agencies.push(newAgency);
+
+    const newProfile: Profile = {
+      ...profile,
+      id: `u-${Math.random().toString(36).substr(2, 9)}`,
+      agency_id: newAgency.id,
+      role: 'agency_admin'
+    };
+    db_profiles.push(newProfile);
+
+    if (generateDemoData) {
+      this.generateDemoDataForAgency(newAgency.id, newAgency.country);
+    }
+
+    return { agency: newAgency, profile: newProfile };
+  },
+
+  generateDemoDataForAgency(agencyId: string, country: string) {
+    const isCI = country === "Côte d'Ivoire";
+
+    // Add 2 Landlords
+    const l1: Landlord = {
+      id: `l-${Math.random().toString(36).substr(2, 9)}`,
+      agency_id: agencyId,
+      first_name: 'Amadou',
+      last_name: 'Koné',
+      email: 'amadou.kone@gmail.com',
+      phone: isCI ? '+225 07 89 01 23 45' : '+221 77 123 45 67',
+      address: isCI ? 'Cocody, Abidjan' : 'Almadies, Dakar',
+      bank_details: 'RIB SGCI CI008 01202 98765432109 88',
+      mobile_money_details: 'Wave: ' + (isCI ? '+225 07 89 01 23 45' : '+221 77 123 45 67')
+    };
+    const l2: Landlord = {
+      id: `l-${Math.random().toString(36).substr(2, 9)}`,
+      agency_id: agencyId,
+      first_name: 'Chantal',
+      last_name: 'Boni',
+      email: 'chantal.boni@gmail.com',
+      phone: isCI ? '+225 05 12 34 56 78' : '+221 70 987 65 43',
+      address: isCI ? 'Zone 4, Abidjan' : 'Plateau, Dakar',
+      bank_details: 'RIB CBAO SN012 01001 00223344556 77',
+      mobile_money_details: 'Orange Money: ' + (isCI ? '+225 05 12 34 56 78' : '+221 70 987 65 43')
+    };
+    db_landlords.push(l1, l2);
+
+    // Add 2 Tenants
+    const t1: Tenant = {
+      id: `t-${Math.random().toString(36).substr(2, 9)}`,
+      agency_id: agencyId,
+      first_name: 'Koffi',
+      last_name: 'Kouassi',
+      email: 'koffi.kouassi@gmail.com',
+      phone: isCI ? '+225 07 45 45 45 45' : '+221 76 800 11 22',
+      profession: 'Ingénieur',
+      employer: 'Tech CI'
+    };
+    const t2: Tenant = {
+      id: `t-${Math.random().toString(36).substr(2, 9)}`,
+      agency_id: agencyId,
+      first_name: 'Marie-Estelle',
+      last_name: 'Ouedraogo',
+      email: 'marie.estelle@ecobank.com',
+      phone: isCI ? '+225 05 88 99 00 11' : '+221 78 555 44 33',
+      profession: 'Directrice Financière',
+      employer: 'Ecobank'
+    };
+    db_tenants.push(t1, t2);
+
+    // Add 3 Properties
+    const p1: Property = {
+      id: `p-${Math.random().toString(36).substr(2, 9)}`,
+      agency_id: agencyId,
+      name: 'Appartement F3 Chic',
+      type: 'Appartement',
+      status: 'Occupé',
+      address: isCI ? 'Marcory Zone 4' : 'Fann Résidence',
+      city: isCI ? 'Abidjan' : 'Dakar',
+      country: country,
+      description: 'Superbe appartement 3 pièces meublé, groupe électrogène, ascenseur, sécurité.',
+      surface: 120,
+      rooms: 3,
+      rental_value: 850000,
+      gallery: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80'],
+      listing_type: 'Location'
+    };
+    const p2: Property = {
+      id: `p-${Math.random().toString(36).substr(2, 9)}`,
+      agency_id: agencyId,
+      name: 'Villa Prestige avec Piscine',
+      type: 'Villa',
+      status: 'Disponible',
+      address: isCI ? 'Cocody Riviera 3' : 'Almadies',
+      city: isCI ? 'Abidjan' : 'Dakar',
+      country: country,
+      description: 'Villa contemporaine de 5 pièces, grand jardin et piscine.',
+      surface: 350,
+      rooms: 5,
+      rental_value: 1500000,
+      gallery: ['https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80'],
+      listing_type: 'Location'
+    };
+    const p3: Property = {
+      id: `p-${Math.random().toString(36).substr(2, 9)}`,
+      agency_id: agencyId,
+      name: 'Terrain Résidentiel Bingerville',
+      type: 'Terrain',
+      status: 'Disponible',
+      address: isCI ? 'Bingerville' : 'Somone',
+      city: isCI ? 'Abidjan' : 'Dakar',
+      country: country,
+      description: 'Terrain de 500m2 avec ACD, viabilisé et prêt pour construction immédiate.',
+      surface: 500,
+      rooms: 0,
+      rental_value: 25000000,
+      gallery: ['https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80'],
+      listing_type: 'Vente'
+    };
+    db_properties.push(p1, p2, p3);
+
+    // Add 1 Lease
+    const lease: Lease = {
+      id: `b-${Math.random().toString(36).substr(2, 9)}`,
+      agency_id: agencyId,
+      property_id: p1.id,
+      tenant_id: t1.id,
+      type: 'Habitation',
+      start_date: '2026-01-01',
+      rent_amount: 850000,
+      deposit_amount: 1700000,
+      advance_months: 2,
+      charges_amount: 50000,
+      payment_day: 5,
+      status: 'Actif'
+    };
+    db_leases.push(lease);
+
+    // Add 2 Payments
+    const pay1: Payment = {
+      id: `pay-${Math.random().toString(36).substr(2, 9)}`,
+      agency_id: agencyId,
+      lease_id: lease.id,
+      amount: 900000,
+      period_start: '2026-05-01',
+      period_end: '2026-05-31',
+      status: 'Payé',
+      payment_date: '2026-05-04T12:00:00Z',
+      method: 'Wave',
+      reference: 'TX-WAVE-887162'
+    };
+    const pay2: Payment = {
+      id: `pay-${Math.random().toString(36).substr(2, 9)}`,
+      agency_id: agencyId,
+      lease_id: lease.id,
+      amount: 900000,
+      period_start: '2026-06-01',
+      period_end: '2026-06-30',
+      status: 'Impayé'
+    };
+    db_payments.push(pay1, pay2);
+
+    // Add CRM Lead
+    const lead: CRMLead = {
+      id: `c-${Math.random().toString(36).substr(2, 9)}`,
+      agency_id: agencyId,
+      first_name: 'Désiré',
+      last_name: "N'Guessan",
+      phone: isCI ? '+225 07 11 22 33 44' : '+221 77 988 77 66',
+      email: 'desire.nguessan@gmail.com',
+      interest_type: 'Location',
+      budget: 750000,
+      status: 'Qualifié',
+      notes: 'Recherche appartement F3/F4 Riviera',
+      created_at: new Date().toISOString()
+    };
+    db_crm_leads.push(lead);
+
+    // Add maintenance ticket
+    const ticket: MaintenanceTicket = {
+      id: `mt-${Math.random().toString(36).substr(2, 9)}`,
+      agency_id: agencyId,
+      property_id: p1.id,
+      title: 'Fuite eau cuisine',
+      description: 'Fuite au niveau du siphon de l\'évier',
+      status: 'Nouveau',
+      priority: 'Moyenne',
+      cost: 0,
+      created_at: new Date().toISOString()
+    };
+    db_maintenance_tickets.push(ticket);
+  },
+
   getAgency(): Agency {
-    return db_agencies.find(a => a.id === this.activeAgencyId) || db_agencies[0];
+    const found = db_agencies.find(a => a.id === this.activeAgencyId) || db_agencies[0];
+    if (found) return found;
+    return {
+      id: '',
+      name: 'Aucune Agence',
+      logo_url: '',
+      country: "Côte d'Ivoire",
+      currency: 'FCFA',
+      address: '',
+      phone: '',
+      email: '',
+      plan: 'Standard',
+      status: 'Actif'
+    };
   },
 
   getAgencies(): Agency[] {
