@@ -130,7 +130,7 @@ export default function LandingPage() {
 
           <div className="flex items-center gap-4">
             <Link 
-              href="/dashboard" 
+              href="/dashboard?login=true" 
               className="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-200 border border-slate-800 hover:bg-slate-900 hover:text-white transition-all"
             >
               Démo Agence
@@ -224,7 +224,7 @@ export default function LandingPage() {
                   <p className="text-xs text-slate-500">Pas de faux formulaires : une application de gestion complète et simulée.</p>
                 </div>
                 <Link
-                  href="/dashboard"
+                  href="/dashboard?login=true"
                   className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-950 bg-white hover:bg-slate-100 transition-colors flex items-center gap-2 shrink-0 shadow-lg shadow-black/20"
                 >
                   Accéder au Dashboard <ArrowRight className="w-3.5 h-3.5 text-slate-950" />
@@ -1131,17 +1131,17 @@ export default function LandingPage() {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link 
-              href="/dashboard"
+              href="/dashboard?signup=true"
               className="w-full sm:w-auto px-8 py-4 rounded-xl text-sm font-bold text-slate-950 bg-amber-500 hover:bg-amber-400 transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10"
             >
               Créer mon compte agence
             </Link>
-            <Link 
-              href="/dashboard"
+            <a 
+              href="#contact"
               className="w-full sm:w-auto px-8 py-4 rounded-xl text-sm font-bold text-slate-300 hover:text-white border border-slate-800 hover:bg-slate-900 transition-all text-center block"
             >
               Prendre rendez-vous avec un conseiller
-            </Link>
+            </a>
           </div>
         </div>
       </section>

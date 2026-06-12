@@ -398,8 +398,16 @@ export default function DashboardPage() {
       }
       if (params.get('signup') === 'true') {
         setAuthMode('signup');
+        setIsAuthenticated(false);
+        sessionStorage.removeItem('immo360_authenticated');
+        sessionStorage.removeItem('immo360_user_email');
+        mockSupabase.setActiveAgency('');
       } else if (params.get('login') === 'true') {
         setAuthMode('login');
+        setIsAuthenticated(false);
+        sessionStorage.removeItem('immo360_authenticated');
+        sessionStorage.removeItem('immo360_user_email');
+        mockSupabase.setActiveAgency('');
       }
     }
 
