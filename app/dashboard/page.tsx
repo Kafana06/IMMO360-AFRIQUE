@@ -386,10 +386,13 @@ export default function DashboardPage() {
       setUserRole('super_admin');
       setActiveMenu('saas');
       setShowRoleSwitcher(true);
+      setIsAuthenticated(true);
+      sessionStorage.setItem('immo360_authenticated', 'true');
+      sessionStorage.setItem('immo360_user_email', 'admin@immo360.africa');
       setSecretLoginOpen(false);
       setSecretPassword('');
       setSecretError(null);
-      showToast("Accès Super Admin (Propriétaire SaaS) activé !");
+      showToast("Accès Propriétaire SaaS activé !");
     } else {
       setSecretError("Code d'accès incorrect.");
     }
@@ -692,7 +695,10 @@ export default function DashboardPage() {
         <div className="relative z-10 w-full max-w-md p-6">
           {/* Logo / Title */}
           <div className="flex flex-col items-center mb-6 text-center animate-fadeIn">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center shadow-2xl shadow-amber-500/20 mb-3">
+            <div 
+              onClick={handleLogoClick}
+              className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center shadow-2xl shadow-amber-500/20 mb-3 cursor-pointer"
+            >
               <Building2 className="w-6 h-6 text-slate-950 stroke-[2.5]" />
             </div>
             <h1 className="font-title text-xl font-extrabold text-white tracking-tight">
@@ -971,6 +977,74 @@ export default function DashboardPage() {
             </Link>
           </div>
         </div>
+
+        {/* MODAL SECRET CONNECT: PROPRIÉTAIRE SAAS */}
+        <AnimatePresence>
+          {secretLoginOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.75 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setSecretLoginOpen(false)}
+                className="absolute inset-0 bg-slate-950/70 backdrop-blur-md"
+              />
+              
+              <motion.div 
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-slate-900 border border-slate-800 text-white rounded-3xl shadow-2xl p-8 max-w-sm w-full relative z-10 text-center animate-scaleIn"
+              >
+                <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-amber-500/20">
+                  <ShieldCheck className="w-6 h-6 text-amber-500 animate-pulse" />
+                </div>
+                <h3 className="font-title text-lg font-bold text-white mb-1">Accès Propriétaire</h3>
+                <p className="text-xs text-slate-400 mb-6">Zone sécurisée IMMO360 AFRIQUE</p>
+   
+                <form onSubmit={handleSecretLoginSubmit} className="space-y-4 text-left">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-2 font-medium">Saisir le Code d'accès</label>
+                    <input
+                      type="password"
+                      required
+                      value={secretPassword}
+                      onChange={(e) => {
+                        setSecretPassword(e.target.value);
+                        setSecretError(null);
+                      }}
+                      placeholder="••••••••"
+                      className="w-full bg-slate-850 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500 text-sm font-mono tracking-widest text-center"
+                    />
+                    {secretError && (
+                      <span className="text-[10px] text-rose-500 font-bold block mt-1.5 text-center">{secretError}</span>
+                    )}
+                  </div>
+   
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSecretLoginOpen(false);
+                        setSecretPassword('');
+                        setSecretError(null);
+                      }}
+                      className="w-1/2 py-3 rounded-xl border border-slate-800 hover:bg-slate-850 font-semibold text-xs transition-colors text-slate-400"
+                    >
+                      Fermer
+                    </button>
+                    <button
+                      type="submit"
+                      className="w-1/2 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition-all shadow-lg hover:shadow-xl shadow-amber-500/10 cursor-pointer"
+                    >
+                      Connexion
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
