@@ -60,6 +60,7 @@ export default function DashboardPage() {
   // Rôle de l'utilisateur (Admin Agence ou Super Admin du SaaS)
   const [userRole, setUserRole] = useState<'agency_admin' | 'super_admin'>('agency_admin');
   const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
+  const [isOwnerUser, setIsOwnerUser] = useState(false);
 
   // States pour la connexion propriétaire secrète
   const [secretLoginOpen, setSecretLoginOpen] = useState(false);
@@ -286,6 +287,19 @@ export default function DashboardPage() {
       setIsAuthenticated(true);
       sessionStorage.setItem('immo360_authenticated', 'true');
       sessionStorage.setItem('immo360_user_email', emailLower);
+      
+      const isOwner = emailLower === 'kafanafousseni@gmail.com' || emailLower === 'kafana' || emailLower === 'admin@immo360.africa';
+      setIsOwnerUser(isOwner);
+      if (isOwner) {
+        setUserRole('super_admin');
+        setActiveMenu('saas');
+        setShowRoleSwitcher(true);
+      } else {
+        setUserRole('agency_admin');
+        setActiveMenu('overview');
+        setShowRoleSwitcher(false);
+      }
+
       reloadData();
       showToast(`Connexion réussie : Bienvenue chez ${matchedAgency.name}`);
       setLoginLoading(false);
@@ -396,6 +410,7 @@ export default function DashboardPage() {
       setActiveMenu('saas');
       setShowRoleSwitcher(true);
       setIsAuthenticated(true);
+      setIsOwnerUser(true);
       sessionStorage.setItem('immo360_authenticated', 'true');
       sessionStorage.setItem('immo360_user_email', 'admin@immo360.africa');
       setSecretLoginOpen(false);
@@ -415,17 +430,20 @@ export default function DashboardPage() {
         setUserRole('super_admin');
         setActiveMenu('saas');
         setShowRoleSwitcher(true);
+        setIsOwnerUser(true);
         showToast("Accès Propriétaire SaaS activé via clé secrète !");
       }
       if (params.get('signup') === 'true') {
         setAuthMode('signup');
         setIsAuthenticated(false);
+        setIsOwnerUser(false);
         sessionStorage.removeItem('immo360_authenticated');
         sessionStorage.removeItem('immo360_user_email');
         mockSupabase.setActiveAgency('');
       } else if (params.get('login') === 'true') {
         setAuthMode('login');
         setIsAuthenticated(false);
+        setIsOwnerUser(false);
         sessionStorage.removeItem('immo360_authenticated');
         sessionStorage.removeItem('immo360_user_email');
         mockSupabase.setActiveAgency('');
@@ -468,7 +486,15 @@ export default function DashboardPage() {
       const email = sessionStorage.getItem('immo360_user_email');
       const agenciesList = mockSupabase.getAgencies();
       if (email) {
-        const found = agenciesList.find(a => a.email.toLowerCase() === email.toLowerCase());
+        const emailLower = email.trim().toLowerCase();
+        const isOwner = emailLower === 'kafanafousseni@gmail.com' || emailLower === 'kafana' || emailLower === 'admin@immo360.africa';
+        setIsOwnerUser(isOwner);
+        if (isOwner) {
+          setUserRole('super_admin');
+          setActiveMenu('saas');
+          setShowRoleSwitcher(true);
+        }
+        const found = agenciesList.find(a => a.email.toLowerCase() === emailLower);
         if (found) {
           mockSupabase.setActiveAgency(found.id);
         } else if (agenciesList.length > 0) {
@@ -1135,7 +1161,7 @@ export default function DashboardPage() {
           <div className="items-center gap-3 hidden md:flex">
             <div 
               onDoubleClick={() => {
-                if (userRole === 'super_admin') {
+                if (isOwnerUser || userRole === 'super_admin') {
                   setShowRoleSwitcher(!showRoleSwitcher);
                 }
               }}
@@ -1146,7 +1172,7 @@ export default function DashboardPage() {
               {userRole === 'super_admin' ? 'SA' : 'JP'}
             </div>
             <div className="text-left">
-              {userRole === 'super_admin' ? (
+              {isOwnerUser || userRole === 'super_admin' ? (
                 <select
                   value={userRole}
                   onChange={(e) => {
@@ -1157,7 +1183,6 @@ export default function DashboardPage() {
                       showToast("Accès Super Admin (Propriétaire SaaS) activé !");
                     } else {
                       setActiveMenu('overview');
-                      setShowRoleSwitcher(false);
                       showToast("Accès Administrateur Agence activé.");
                     }
                   }}
@@ -1316,6 +1341,9 @@ export default function DashboardPage() {
                 sessionStorage.removeItem('immo360_authenticated');
                 sessionStorage.removeItem('immo360_user_email');
                 setIsAuthenticated(false);
+                setIsOwnerUser(false);
+                setUserRole('agency_admin');
+                setShowRoleSwitcher(false);
               }}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
             >
@@ -1419,12 +1447,12 @@ export default function DashboardPage() {
                   {/* Sélecteur de Rôle sur Mobile */}
                   <div 
                     onDoubleClick={() => {
-                      if (userRole === 'super_admin') {
+                      if (isOwnerUser || userRole === 'super_admin') {
                         setShowRoleSwitcher(!showRoleSwitcher);
                       }
                     }}
                     className={`flex items-center gap-3 p-3 rounded-2xl mb-4 text-left border ${
-                      userRole === 'super_admin' 
+                      isOwnerUser || userRole === 'super_admin' 
                         ? 'bg-amber-50 border-amber-200 cursor-pointer' 
                         : 'bg-slate-50 border-slate-200'
                     }`}
@@ -1442,7 +1470,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {userRole === 'super_admin' && showRoleSwitcher && (
+                  {(isOwnerUser || userRole === 'super_admin') && showRoleSwitcher && (
                     <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 mb-4 text-left animate-fadeIn">
                       <span className="text-[10px] font-bold text-amber-700 block mb-2 uppercase tracking-wider">Mode Développeur / Rôle</span>
                       <select
@@ -1525,6 +1553,9 @@ export default function DashboardPage() {
                       sessionStorage.removeItem('immo360_user_email');
                       setIsAuthenticated(false);
                       setMobileMenuOpen(false);
+                      setIsOwnerUser(false);
+                      setUserRole('agency_admin');
+                      setShowRoleSwitcher(false);
                     }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-rose-600"
                   >
