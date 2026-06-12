@@ -265,7 +265,10 @@ export default function DashboardPage() {
       const pass = loginPassword.trim();
 
       const agenciesList = mockSupabase.getAgencies();
-      const matchedAgency = agenciesList.find(a => a.email.toLowerCase() === emailLower);
+      const matchedAgency = agenciesList.find(a => 
+        a.email.toLowerCase() === emailLower || 
+        (emailLower === 'kafana' && a.email.toLowerCase() === 'kafanafousseni@gmail.com')
+      );
 
       if (!matchedAgency) {
         setLoginError("Aucune agence trouvée avec cet email d'administrateur.");
@@ -273,7 +276,7 @@ export default function DashboardPage() {
         return;
       }
 
-      if (pass !== 'password' && pass !== 'admin' && pass !== '123456') {
+      if (pass !== 'password' && pass !== 'admin' && pass !== '123456' && pass !== 'Kafana0605@') {
         setLoginError("Mot de passe incorrect.");
         setLoginLoading(false);
         return;

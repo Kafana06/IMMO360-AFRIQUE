@@ -164,9 +164,32 @@ export interface SaleTransaction {
   created_at: string;
 }
 
-// Données en mémoire initialisées vides (plus de comptes d'essai préchargés)
-let db_agencies: Agency[] = [];
-let db_profiles: Profile[] = [];
+// Données en mémoire initialisées avec le compte d'administration par défaut (Kafana)
+let db_agencies: Agency[] = [
+  {
+    id: 'a-kafana',
+    name: 'Kafana',
+    logo_url: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=200&q=80',
+    country: "Côte d'Ivoire",
+    currency: 'FCFA',
+    address: 'Abidjan',
+    phone: '+225 07 89 01 23 45',
+    email: 'kafanafousseni@gmail.com',
+    plan: 'Standard',
+    status: 'Actif'
+  }
+];
+let db_profiles: Profile[] = [
+  {
+    id: 'u-kafana',
+    agency_id: 'a-kafana',
+    email: 'kafanafousseni@gmail.com',
+    first_name: 'Fousseni',
+    last_name: 'Kafana',
+    phone: '+225 07 89 01 23 45',
+    role: 'agency_admin'
+  }
+];
 let db_landlords: Landlord[] = [];
 let db_properties: Property[] = [];
 let db_tenants: Tenant[] = [];
@@ -662,3 +685,6 @@ export const mockSupabase = {
     return newTx;
   }
 };
+
+// Pré-remplissage des données de démo pour le compte d'agence par défaut Kafana
+mockSupabase.generateDemoDataForAgency('a-kafana', "Côte d'Ivoire");
