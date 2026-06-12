@@ -193,12 +193,21 @@ export default function DashboardPage() {
   // Authentification agence
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('signup') === 'true' || params.get('login') === 'true') {
+        sessionStorage.removeItem('immo360_authenticated');
+        sessionStorage.removeItem('immo360_user_email');
+        return false;
+      }
       return sessionStorage.getItem('immo360_authenticated') === 'true';
     }
     return false;
   });
   const [authMode, setAuthMode] = useState<'login' | 'signup'>(() => {
     if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('signup') === 'true') return 'signup';
+      if (params.get('login') === 'true') return 'login';
       return mockSupabase.getAgencies().length === 0 ? 'signup' : 'login';
     }
     return 'login';
