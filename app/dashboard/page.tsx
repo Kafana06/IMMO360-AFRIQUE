@@ -32,7 +32,7 @@ import {
   Lock,
   Mail
 } from 'lucide-react';
-import { mockSupabase, Agency, Property, Landlord, Tenant, Lease, Payment, Receipt, MaintenanceTicket, CRMLead, SocialHousingApplication, SaleTransaction } from '@/lib/supabase/mock';
+import { mockSupabase, Agency, Property, Landlord, Tenant, Lease, Payment, Receipt, MaintenanceTicket, CRMLead, SocialHousingApplication, SaleTransaction, Profile } from '@/lib/supabase/mock';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -61,6 +61,7 @@ export default function DashboardPage() {
   const [userRole, setUserRole] = useState<'agency_admin' | 'super_admin'>('agency_admin');
   const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
   const [isOwnerUser, setIsOwnerUser] = useState(false);
+  const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
 
   // States pour la connexion propriétaire secrète
   const [secretLoginOpen, setSecretLoginOpen] = useState(false);
@@ -229,7 +230,7 @@ export default function DashboardPage() {
   const [signupFirstName, setSignupFirstName] = useState('');
   const [signupLastName, setSignupLastName] = useState('');
   const [signupUserPhone, setSignupUserPhone] = useState('');
-  const [generateDemoData, setGenerateDemoData] = useState(true);
+  const [generateDemoData, setGenerateDemoData] = useState(false);
   const [signupError, setSignupError] = useState<string | null>(null);
   const [signupLoading, setSignupLoading] = useState(false);
 
@@ -479,6 +480,21 @@ export default function DashboardPage() {
     setCrmLeads(mockSupabase.getCRMLeads());
     setSocialApps(mockSupabase.getSocialHousingApplications());
     setSales(mockSupabase.getSaleTransactions());
+    reloadUserProfile();
+  };
+
+  const reloadUserProfile = () => {
+    if (typeof window !== 'undefined') {
+      const email = sessionStorage.getItem('immo360_user_email');
+      if (email) {
+        const prof = mockSupabase.getProfileByEmail(email);
+        if (prof) {
+          setCurrentUserProfile(prof);
+          return;
+        }
+      }
+      setCurrentUserProfile(null);
+    }
   };
 
   useEffect(() => {
@@ -719,6 +735,54 @@ export default function DashboardPage() {
     const matchesStatus = selectedStatusFilter === 'Tous' || prop.status === selectedStatusFilter;
     return matchesType && matchesStatus;
   });
+
+  // Activités récentes construites de manière dynamique pour refléter le contenu réel de la base de données
+  const activities: { icon: any; color: string; text: string; time: string }[] = [];
+  
+  payments
+    .filter(p => p.status === 'Payé')
+    .slice(0, 2)
+    .forEach(p => {
+      activities.push({
+        icon: CreditCard,
+        color: "text-emerald-500 bg-emerald-50",
+        text: `Paiement de ${p.lease?.tenant?.first_name || ''} ${p.lease?.tenant?.last_name?.charAt(0) || ''}. reçu par ${p.method || 'Mobile Money'}`,
+        time: p.payment_date ? new Date(p.payment_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : "Récemment"
+      });
+    });
+
+  leases
+    .slice(0, 1)
+    .forEach(l => {
+      activities.push({
+        icon: FileText,
+        color: "text-blue-500 bg-blue-50",
+        text: `Bail ${l.property?.name || ''} enregistré`,
+        time: new Date(l.start_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+      });
+    });
+
+  tickets
+    .slice(0, 1)
+    .forEach(t => {
+      activities.push({
+        icon: Wrench,
+        color: "text-amber-500 bg-amber-50",
+        text: `Ticket maintenance : "${t.title}"`,
+        time: new Date(t.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+      });
+    });
+
+  crmLeads
+    .slice(0, 1)
+    .forEach(c => {
+      activities.push({
+        icon: Users,
+        color: "text-purple-500 bg-purple-50",
+        text: `Prospect ${c.first_name} ${c.last_name} qualifié`,
+        time: new Date(c.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+      });
+    });
 
   if (!isAuthenticated) {
     return (
@@ -968,19 +1032,6 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 pt-2">
-                    <input
-                      type="checkbox"
-                      id="generateDemoData"
-                      checked={generateDemoData}
-                      onChange={(e) => setGenerateDemoData(e.target.checked)}
-                      className="rounded border-slate-800 bg-slate-950 text-amber-500 focus:ring-amber-500 h-4 w-4 cursor-pointer"
-                    />
-                    <label htmlFor="generateDemoData" className="text-[11px] text-slate-300 select-none cursor-pointer">
-                      Pré-remplir l'agence avec des données de démo (biens, locataires, baux)
-                    </label>
-                  </div>
-
                   <div className="pt-2">
                     <button
                       type="submit"
@@ -1169,7 +1220,13 @@ export default function DashboardPage() {
                 userRole === 'super_admin' ? 'bg-amber-500 text-slate-950 cursor-pointer' : 'bg-slate-200 text-slate-800'
               }`}
             >
-              {userRole === 'super_admin' ? 'SA' : 'JP'}
+              {userRole === 'super_admin' 
+                ? 'SA' 
+                : (currentUserProfile 
+                    ? `${currentUserProfile.first_name?.[0] || ''}${currentUserProfile.last_name?.[0] || ''}`.toUpperCase() 
+                    : 'AD'
+                  )
+              }
             </div>
             <div className="text-left">
               {isOwnerUser || userRole === 'super_admin' ? (
@@ -1192,7 +1249,9 @@ export default function DashboardPage() {
                   <option value="super_admin">Propriétaire SaaS</option>
                 </select>
               ) : (
-                <span className="text-xs font-bold text-slate-850 block">Jean-Philippe Koffi</span>
+                <span className="text-xs font-bold text-slate-850 block">
+                  {currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'Administrateur'}
+                </span>
               )}
               <span className="text-[10px] text-slate-400 block -mt-0.5">
                 {userRole === 'super_admin' ? 'SaaS Owner (Toutes Options)' : 'Administrateur Agence'}
@@ -1460,10 +1519,18 @@ export default function DashboardPage() {
                     <div className={`w-8 h-8 rounded-full font-bold flex items-center justify-center text-xs shrink-0 ${
                       userRole === 'super_admin' ? 'bg-amber-500 text-slate-950' : 'bg-slate-200 text-slate-800'
                     }`}>
-                      {userRole === 'super_admin' ? 'SA' : 'JP'}
+                      {userRole === 'super_admin' 
+                        ? 'SA' 
+                        : (currentUserProfile 
+                            ? `${currentUserProfile.first_name?.[0] || ''}${currentUserProfile.last_name?.[0] || ''}`.toUpperCase() 
+                            : 'AD'
+                          )
+                      }
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-slate-800 block">Jean-Philippe Koffi</span>
+                      <span className="text-xs font-bold text-slate-800 block">
+                        {currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'Administrateur'}
+                      </span>
                       <span className="text-[10px] text-slate-400 block -mt-0.5">
                         {userRole === 'super_admin' ? 'Propriétaire SaaS' : 'Administrateur Agence'}
                       </span>
@@ -1490,7 +1557,9 @@ export default function DashboardPage() {
                         }}
                         className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none"
                       >
-                        <option value="agency_admin">Jean-Philippe (Admin Agence)</option>
+                        <option value="agency_admin">
+                          {currentUserProfile ? `${currentUserProfile.first_name} (Admin Agence)` : 'Admin Agence'}
+                        </option>
                         <option value="super_admin">Propriétaire SaaS (Super Admin)</option>
                       </select>
                     </div>
@@ -1798,22 +1867,23 @@ export default function DashboardPage() {
                   <h3 className="text-sm font-bold text-slate-900 pb-3 border-b border-slate-100">Journal d'activités</h3>
                   
                   <div className="space-y-4 text-left">
-                    {[
-                      { icon: CreditCard, color: "text-emerald-500 bg-emerald-50", text: "Paiement de Marie-Estelle O. reçu par Wave", time: "Hier, 16:45" },
-                      { icon: FileText, color: "text-blue-500 bg-blue-50", text: "Bail Villa Prestige Cocody généré et signé", time: "05 Juin, 14:30" },
-                      { icon: Wrench, color: "text-amber-500 bg-amber-50", text: "Nouveau ticket de maintenance enregistré", time: "01 Juin, 09:00" },
-                      { icon: Users, color: "text-purple-500 bg-purple-50", text: "Prospect Désiré N'Guessan qualifié dans le CRM", time: "15 Mai, 10:00" }
-                    ].map((act, idx) => (
-                      <div key={idx} className="flex gap-3 text-xs">
-                        <div className={`w-8 h-8 rounded-lg shrink-0 flex items-center justify-center ${act.color}`}>
-                          <act.icon className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="text-slate-700 font-semibold leading-snug">{act.text}</p>
-                          <span className="text-[10px] text-slate-400 block mt-0.5">{act.time}</span>
-                        </div>
+                    {activities.length === 0 ? (
+                      <div className="text-center py-8 text-xs text-slate-400">
+                        Aucune activité récente.
                       </div>
-                    ))}
+                    ) : (
+                      activities.map((act, idx) => (
+                        <div key={act.text + idx} className="flex gap-3 text-xs">
+                          <div className={`w-8 h-8 rounded-lg shrink-0 flex items-center justify-center ${act.color}`}>
+                            <act.icon className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="text-slate-700 font-semibold leading-snug">{act.text}</p>
+                            <span className="text-[10px] text-slate-400 block mt-0.5">{act.time}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -1877,47 +1947,69 @@ export default function DashboardPage() {
 
                {/* Grille des biens */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredProperties.map(prop => (
-                  <div key={prop.id} onClick={() => setSelectedPropertyForDetails(prop)} className="rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-md hover:border-slate-300 transition-all group cursor-pointer">
-                    <div className="relative aspect-video w-full bg-slate-100 overflow-hidden">
-                      <img 
-                        src={prop.gallery[0]} 
-                        alt={prop.name}
-                        className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
-                      />
-                      <span className={`absolute top-4 right-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        prop.status === 'Disponible' ? 'bg-emerald-500 text-white' : 
-                        prop.status === 'Occupé' ? 'bg-blue-500 text-white' : 
-                        'bg-amber-500 text-white'
-                      }`}>
-                        {prop.status}
-                      </span>
+                {properties.length === 0 ? (
+                  <div className="col-span-full text-center py-16 px-6 bg-white border border-slate-200 rounded-3xl shadow-sm max-w-lg mx-auto space-y-4 my-6">
+                    <div className="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto border border-amber-500/20">
+                      <Building2 className="w-8 h-8 text-amber-500 animate-pulse" />
                     </div>
-
-                    <div className="p-6 text-left flex-1 flex flex-col justify-between">
-                      <div className="space-y-2">
-                        <span className="text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider">{prop.type}</span>
-                        <h3 className="text-base font-bold text-slate-900">{prop.name}</h3>
-                        <p className="text-xs text-slate-500 flex items-center gap-1">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400" /> {prop.address}, {prop.city}
-                        </p>
-                        <p className="text-xs text-slate-650 line-clamp-2 mt-2 leading-relaxed">{prop.description}</p>
-                      </div>
-
-                      <div className="pt-4 mt-4 border-t border-slate-100 flex justify-between items-center">
-                        <div className="text-left">
-                          <span className="text-[10px] text-slate-400 block font-semibold">VALEUR LOCATIVE</span>
-                          <span className="text-sm font-bold font-mono text-slate-900">{prop.rental_value.toLocaleString()} {currentAgency.currency}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <span className="text-xs font-mono text-slate-400 font-semibold">{prop.surface} m²</span>
-                          <span className="text-xs text-slate-400 font-semibold">•</span>
-                          <span className="text-xs text-slate-400 font-semibold">{prop.rooms} p.</span>
-                        </div>
-                      </div>
-                    </div>
+                    <h3 className="text-lg font-bold text-slate-900">Aucun bien enregistré</h3>
+                    <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
+                      Votre agence immobilière est prête. Ajoutez votre premier appartement, villa ou terrain à louer ou à vendre pour commencer à gérer votre activité !
+                    </p>
+                    <button
+                      onClick={() => setPropertyModalOpen(true)}
+                      className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 mx-auto cursor-pointer border-none"
+                    >
+                      <Plus className="w-4 h-4" /> Ajouter mon premier bien
+                    </button>
                   </div>
-                ))}
+                ) : filteredProperties.length === 0 ? (
+                  <div className="col-span-full text-center py-12 text-slate-500 font-medium">
+                    Aucun bien ne correspond aux filtres sélectionnés.
+                  </div>
+                ) : (
+                  filteredProperties.map(prop => (
+                    <div key={prop.id} onClick={() => setSelectedPropertyForDetails(prop)} className="rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-md hover:border-slate-300 transition-all group cursor-pointer">
+                      <div className="relative aspect-video w-full bg-slate-100 overflow-hidden">
+                        <img 
+                          src={prop.gallery[0]} 
+                          alt={prop.name}
+                          className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+                        />
+                        <span className={`absolute top-4 right-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          prop.status === 'Disponible' ? 'bg-emerald-500 text-white' : 
+                          prop.status === 'Occupé' ? 'bg-blue-500 text-white' : 
+                          'bg-amber-500 text-white'
+                        }`}>
+                          {prop.status}
+                        </span>
+                      </div>
+
+                      <div className="p-6 text-left flex-1 flex flex-col justify-between">
+                        <div className="space-y-2">
+                          <span className="text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider">{prop.type}</span>
+                          <h3 className="text-base font-bold text-slate-900">{prop.name}</h3>
+                          <p className="text-xs text-slate-500 flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-slate-400" /> {prop.address}, {prop.city}
+                          </p>
+                          <p className="text-xs text-slate-650 line-clamp-2 mt-2 leading-relaxed">{prop.description}</p>
+                        </div>
+
+                        <div className="pt-4 mt-4 border-t border-slate-100 flex justify-between items-center">
+                          <div className="text-left">
+                            <span className="text-[10px] text-slate-400 block font-semibold">VALEUR LOCATIVE</span>
+                            <span className="text-sm font-bold font-mono text-slate-900">{prop.rental_value.toLocaleString()} {currentAgency.currency}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <span className="text-xs font-mono text-slate-400 font-semibold">{prop.surface} m²</span>
+                            <span className="text-xs text-slate-400 font-semibold">•</span>
+                            <span className="text-xs text-slate-400 font-semibold">{prop.rooms} p.</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
 
             </div>
@@ -2124,17 +2216,25 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {landlords.map(landlord => (
-                        <tr key={landlord.id}>
-                          <td className="py-4 font-bold text-slate-900">{landlord.first_name} {landlord.last_name}</td>
-                          <td className="py-4 font-mono text-xs text-slate-700">{landlord.phone}</td>
-                          <td className="py-4 text-slate-650">{landlord.email}</td>
-                          <td className="py-4 text-xs font-mono text-slate-550">
-                            <span className="block text-slate-800 font-bold">{landlord.bank_details}</span>
-                            <span className="block text-amber-600 font-bold mt-0.5">{landlord.mobile_money_details}</span>
+                      {landlords.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="py-8 text-center text-slate-400 text-xs italic">
+                            Aucun bailleur enregistré. Utilisez le bouton ci-dessus pour en ajouter un.
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        landlords.map(landlord => (
+                          <tr key={landlord.id}>
+                            <td className="py-4 font-bold text-slate-900">{landlord.first_name} {landlord.last_name}</td>
+                            <td className="py-4 font-mono text-xs text-slate-700">{landlord.phone}</td>
+                            <td className="py-4 text-slate-650">{landlord.email}</td>
+                            <td className="py-4 text-xs font-mono text-slate-550">
+                              <span className="block text-slate-800 font-bold">{landlord.bank_details}</span>
+                              <span className="block text-amber-600 font-bold mt-0.5">{landlord.mobile_money_details}</span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -2171,17 +2271,25 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {tenants.map(tenant => (
-                        <tr key={tenant.id}>
-                          <td className="py-4 font-bold text-slate-900">{tenant.first_name} {tenant.last_name}</td>
-                          <td className="py-4 font-mono text-xs text-slate-700">{tenant.phone}</td>
-                          <td className="py-4 text-slate-650">
-                            <span className="font-semibold text-slate-800">{tenant.profession}</span>
-                            <span className="block text-[10px] text-slate-400">{tenant.employer}</span>
+                      {tenants.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="py-8 text-center text-slate-400 text-xs italic">
+                            Aucun locataire enregistré. Utilisez le bouton ci-dessus pour en ajouter un.
                           </td>
-                          <td className="py-4 text-slate-600">{tenant.email}</td>
                         </tr>
-                      ))}
+                      ) : (
+                        tenants.map(tenant => (
+                          <tr key={tenant.id}>
+                            <td className="py-4 font-bold text-slate-900">{tenant.first_name} {tenant.last_name}</td>
+                            <td className="py-4 font-mono text-xs text-slate-700">{tenant.phone}</td>
+                            <td className="py-4 text-slate-650">
+                              <span className="font-semibold text-slate-800">{tenant.profession}</span>
+                              <span className="block text-[10px] text-slate-400">{tenant.employer}</span>
+                            </td>
+                            <td className="py-4 text-slate-600">{tenant.email}</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -2205,58 +2313,86 @@ export default function DashboardPage() {
                 </button>
               </div>
 
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {leases.map(lease => (
-                  <div key={lease.id} className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm text-left flex flex-col justify-between hover:shadow-md transition-shadow">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span className="px-2.5 py-0.5 rounded-full bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider">{lease.type}</span>
-                        <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Actif
-                        </span>
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-slate-400 block font-semibold">LOCATAIRE</span>
-                        <h3 className="text-base font-bold text-slate-900">{lease.tenant.first_name} {lease.tenant.last_name}</h3>
-                        <span className="text-xs text-slate-500 block">{lease.property.name}</span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4 py-2 border-t border-b border-slate-100 text-xs">
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">Loyer Mensuel</span>
-                          <span className="font-bold font-mono text-slate-800">{lease.rent_amount.toLocaleString()} FCFA</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">Caution</span>
-                          <span className="font-bold font-mono text-slate-800">{lease.deposit_amount.toLocaleString()} FCFA</span>
-                        </div>
-                      </div>
-
-                      <div className="text-xs text-slate-500 space-y-1">
-                        <div className="flex justify-between">
-                          <span>Entrée en vigueur :</span>
-                          <span className="font-semibold text-slate-800">{lease.start_date}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Échéance loyer :</span>
-                          <span className="font-semibold text-slate-800">Le {lease.payment_day} du mois</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-6 mt-4 border-t border-slate-100">
-                      <a 
-                        href="#" 
-                        onClick={(e) => { e.preventDefault(); showToast("Téléchargement de la quittance PDF simulé."); }}
-                        className="w-full py-2.5 rounded-xl border border-slate-200 text-center text-xs font-bold text-slate-650 hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5"
-                      >
-                        <Download className="w-4 h-4" /> Télécharger le contrat
-                      </a>
-                    </div>
+              {leases.length === 0 ? (
+                <div className="text-center py-16 px-6 bg-white border border-slate-200 rounded-3xl shadow-sm max-w-lg mx-auto space-y-4 my-6">
+                  <div className="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto border border-amber-500/20">
+                    <FileText className="w-8 h-8 text-amber-500" />
                   </div>
-                ))}
-              </div>
+                  <h3 className="text-lg font-bold text-slate-900">Aucun contrat de bail actif</h3>
+                  <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
+                    Une fois que vous avez enregistré des biens, des propriétaires et des locataires, vous pourrez créer des contrats de bail pour générer automatiquement les échéanciers de loyers.
+                  </p>
+                  <button
+                    onClick={() => {
+                      if (properties.length === 0) {
+                        showToast("Veuillez d'abord ajouter un bien dans le catalogue.");
+                        setActiveMenu('properties');
+                      } else if (tenants.length === 0) {
+                        showToast("Veuillez d'abord enregistrer un locataire.");
+                        setActiveMenu('tenants');
+                      } else {
+                        setLeaseModalOpen(true);
+                      }
+                    }}
+                    className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 mx-auto cursor-pointer border-none"
+                  >
+                    <Plus className="w-4 h-4" /> Rédiger mon premier bail
+                  </button>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {leases.map(lease => (
+                    <div key={lease.id} className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm text-left flex flex-col justify-between hover:shadow-md transition-shadow">
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <span className="px-2.5 py-0.5 rounded-full bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider">{lease.type}</span>
+                          <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Actif
+                          </span>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-400 block font-semibold">LOCATAIRE</span>
+                          <h3 className="text-base font-bold text-slate-900">{lease.tenant.first_name} {lease.tenant.last_name}</h3>
+                          <span className="text-xs text-slate-500 block">{lease.property.name}</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 py-2 border-t border-b border-slate-100 text-xs">
+                          <div>
+                            <span className="text-[10px] text-slate-400 block">Loyer Mensuel</span>
+                            <span className="font-bold font-mono text-slate-800">{lease.rent_amount.toLocaleString()} FCFA</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block">Caution</span>
+                            <span className="font-bold font-mono text-slate-800">{lease.deposit_amount.toLocaleString()} FCFA</span>
+                          </div>
+                        </div>
+
+                        <div className="text-xs text-slate-500 space-y-1">
+                          <div className="flex justify-between">
+                            <span>Entrée en vigueur :</span>
+                            <span className="font-semibold text-slate-800">{lease.start_date}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Échéance loyer :</span>
+                            <span className="font-semibold text-slate-800">Le {lease.payment_day} du mois</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-6 mt-4 border-t border-slate-100">
+                        <a 
+                          href="#" 
+                          onClick={(e) => { e.preventDefault(); showToast("Téléchargement de la quittance PDF simulé."); }}
+                          className="w-full py-2.5 rounded-xl border border-slate-200 text-center text-xs font-bold text-slate-650 hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <Download className="w-4 h-4" /> Télécharger le contrat
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -2282,95 +2418,103 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {payments.map(payment => (
-                        <tr key={payment.id}>
-                          <td className="py-4">
-                            <span className="font-bold text-slate-900 block">{payment.lease.tenant.first_name} {payment.lease.tenant.last_name}</span>
-                            <span className="text-xs text-slate-500 block">{payment.lease.property.name}</span>
-                          </td>
-                          <td className="py-4 font-mono text-xs text-slate-600">
-                            Du {payment.period_start} <br />
-                            au {payment.period_end}
-                          </td>
-                          <td className="py-4 font-mono font-bold text-slate-900">
-                            {payment.amount.toLocaleString()} {currentAgency.currency}
-                          </td>
-                          <td className="py-4">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              payment.status === 'Payé' ? 'bg-emerald-100 text-emerald-600' : 
-                              payment.status === 'En retard' ? 'bg-rose-100 text-rose-600' : 
-                              'bg-amber-100 text-amber-600'
-                            }`}>
-                              {payment.status}
-                            </span>
-                            {payment.method && (
-                              <span className="text-[10px] block text-slate-400 font-semibold mt-1">
-                                via {payment.method}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-4">
-                            {payment.status === 'Payé' ? (
-                              (() => {
-                                const landlord = landlords.find(l => {
-                                  const propId = payment.lease.property.id;
-                                  if (propId.includes('p1111111') || propId.includes('p1111113')) return l.id.includes('l1111111');
-                                  if (propId.includes('p1111112') || propId.includes('p1111114')) return l.id.includes('l1111112');
-                                  if (propId.includes('p2222221') || propId.includes('p2222222')) return l.id.includes('l2222221');
-                                  return false;
-                                }) || landlords[0];
-                                
-                                const propAmt = Math.round(payment.amount * 0.9);
-                                const agencyAmt = Math.round(payment.amount * 0.08);
-                                const saasAmt = Math.round(payment.amount * 0.02);
-                                
-                                return (
-                                  <div className="space-y-1.5 text-xs text-left">
-                                    <div className="flex items-center gap-1 font-semibold text-emerald-600">
-                                      <CheckCircle2 className="w-3.5 h-3.5" />
-                                      <span>Versé automatiquement</span>
-                                    </div>
-                                    <div className="text-[10px] text-slate-500 space-y-0.5 font-mono">
-                                      <span className="block">👤 <strong>Propriétaire (90%) :</strong> {propAmt.toLocaleString()} {currentAgency.currency} ({landlord ? landlord.first_name : 'Amadou'} - {landlord ? landlord.mobile_money_details?.split(':')[0] || 'Orange Money' : 'Orange Money'})</span>
-                                      <span className="block">🏢 <strong>Commission Agence (8%) :</strong> {agencyAmt.toLocaleString()} {currentAgency.currency}</span>
-                                      <span className="block">⚡ <strong>Frais SaaS (2%) :</strong> {saasAmt.toLocaleString()} {currentAgency.currency}</span>
-                                    </div>
-                                  </div>
-                                );
-                              })()
-                            ) : (
-                              <div className="text-xs text-slate-400 italic text-left">
-                                En attente d'encaissement...
-                              </div>
-                            )}
-                          </td>
-                          <td className="py-4 text-right">
-                            {payment.status !== 'Payé' ? (
-                              <div className="flex gap-2 justify-end">
-                                <button
-                                  onClick={() => handleSimulateWhatsAppRelance(payment)}
-                                  className="px-3 py-1.5 rounded-lg border border-slate-250 text-xs font-bold text-slate-650 hover:bg-slate-50 transition-all"
-                                >
-                                  Relancer
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setActivePaymentToPay(payment);
-                                    setPayModalOpen(true);
-                                  }}
-                                  className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all"
-                                >
-                                  Encaisser
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="text-xs font-semibold text-emerald-600">
-                                Encaissé le {payment.payment_date ? new Date(payment.payment_date).toLocaleDateString() : ''}
-                              </span>
-                            )}
+                      {payments.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-8 text-center text-slate-400 text-xs italic">
+                            Aucun paiement ou échéance générée. Créez un contrat de bail pour démarrer l'échéancier.
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        payments.map(payment => (
+                          <tr key={payment.id}>
+                            <td className="py-4">
+                              <span className="font-bold text-slate-900 block">{payment.lease.tenant.first_name} {payment.lease.tenant.last_name}</span>
+                              <span className="text-xs text-slate-500 block">{payment.lease.property.name}</span>
+                            </td>
+                            <td className="py-4 font-mono text-xs text-slate-600">
+                              Du {payment.period_start} <br />
+                              au {payment.period_end}
+                            </td>
+                            <td className="py-4 font-mono font-bold text-slate-900">
+                              {payment.amount.toLocaleString()} {currentAgency.currency}
+                            </td>
+                            <td className="py-4">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                payment.status === 'Payé' ? 'bg-emerald-100 text-emerald-600' : 
+                                payment.status === 'En retard' ? 'bg-rose-100 text-rose-600' : 
+                                'bg-amber-100 text-amber-600'
+                              }`}>
+                                {payment.status}
+                              </span>
+                              {payment.method && (
+                                <span className="text-[10px] block text-slate-400 font-semibold mt-1">
+                                  via {payment.method}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-4">
+                              {payment.status === 'Payé' ? (
+                                (() => {
+                                  const landlord = landlords.find(l => {
+                                    const propId = payment.lease.property.id;
+                                    if (propId.includes('p1111111') || propId.includes('p1111113')) return l.id.includes('l1111111');
+                                    if (propId.includes('p1111112') || propId.includes('p1111114')) return l.id.includes('l1111112');
+                                    if (propId.includes('p2222221') || propId.includes('p2222222')) return l.id.includes('l2222221');
+                                    return false;
+                                  }) || landlords[0];
+                                  
+                                  const propAmt = Math.round(payment.amount * 0.9);
+                                  const agencyAmt = Math.round(payment.amount * 0.08);
+                                  const saasAmt = Math.round(payment.amount * 0.02);
+                                  
+                                  return (
+                                    <div className="space-y-1.5 text-xs text-left">
+                                      <div className="flex items-center gap-1 font-semibold text-emerald-600">
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span>Versé automatiquement</span>
+                                      </div>
+                                      <div className="text-[10px] text-slate-500 space-y-0.5 font-mono">
+                                        <span className="block">👤 <strong>Propriétaire (90%) :</strong> {propAmt.toLocaleString()} {currentAgency.currency} ({landlord ? landlord.first_name : 'Amadou'} - {landlord ? landlord.mobile_money_details?.split(':')[0] || 'Orange Money' : 'Orange Money'})</span>
+                                        <span className="block">🏢 <strong>Commission Agence (8%) :</strong> {agencyAmt.toLocaleString()} {currentAgency.currency}</span>
+                                        <span className="block">⚡ <strong>Frais SaaS (2%) :</strong> {saasAmt.toLocaleString()} {currentAgency.currency}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })()
+                              ) : (
+                                <div className="text-xs text-slate-400 italic text-left">
+                                  En attente d'encaissement...
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-4 text-right">
+                              {payment.status !== 'Payé' ? (
+                                <div className="flex gap-2 justify-end">
+                                  <button
+                                    onClick={() => handleSimulateWhatsAppRelance(payment)}
+                                    className="px-3 py-1.5 rounded-lg border border-slate-250 text-xs font-bold text-slate-650 hover:bg-slate-50 transition-all"
+                                  >
+                                    Relancer
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setActivePaymentToPay(payment);
+                                      setPayModalOpen(true);
+                                    }}
+                                    className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all"
+                                  >
+                                    Encaisser
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-xs font-semibold text-emerald-600">
+                                  Encaissé le {payment.payment_date ? new Date(payment.payment_date).toLocaleDateString() : ''}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -2450,50 +2594,62 @@ export default function DashboardPage() {
                 <p className="text-xs text-slate-500">Gérez les pannes, affectez des prestataires et contrôlez les coûts d'entretien de vos biens.</p>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-6">
-                {tickets.map(ticket => (
-                  <div key={ticket.id} className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm text-left flex flex-col justify-between hover:shadow-md transition-shadow">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-start gap-4">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          ticket.priority === 'Urgente' || ticket.priority === 'Haute' ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          Priorité {ticket.priority}
-                        </span>
-                        <span className="px-2.5 py-0.5 rounded-full bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider">
-                          {ticket.status}
-                        </span>
-                      </div>
-
-                      <div className="space-y-1">
-                        <h3 className="text-base font-bold text-slate-900">{ticket.title}</h3>
-                        <span className="text-xs font-semibold text-amber-600 block">{ticket.property.name}</span>
-                        <p className="text-xs text-slate-500 leading-relaxed pt-2">{ticket.description}</p>
-                      </div>
-
-                      <div className="p-3 bg-slate-50 rounded-2xl text-xs space-y-1">
-                        <div className="flex justify-between">
-                          <span className="text-slate-450">Prestataire :</span>
-                          <span className="font-semibold text-slate-800">{ticket.contractor_name || 'Non assigné'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-455">Coût estimé :</span>
-                          <span className="font-semibold text-slate-800 font-mono">{ticket.cost.toLocaleString()} {currentAgency.currency}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-6 mt-4 border-t border-slate-100 flex gap-2">
-                      <button 
-                        onClick={() => { mockSupabase.updateTicketStatus(ticket.id, 'Résolu'); reloadData(); showToast("Ticket de maintenance résolu."); }}
-                        className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-center text-xs font-bold text-white transition-colors"
-                      >
-                        Marquer Résolu
-                      </button>
-                    </div>
+              {tickets.length === 0 ? (
+                <div className="text-center py-16 px-6 bg-white border border-slate-200 rounded-3xl shadow-sm max-w-lg mx-auto space-y-4 my-6">
+                  <div className="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto border border-amber-500/20">
+                    <Wrench className="w-8 h-8 text-amber-500" />
                   </div>
-                ))}
-              </div>
+                  <h3 className="text-lg font-bold text-slate-900">Aucun ticket de maintenance</h3>
+                  <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
+                    Aucune panne ou réparation n'est actuellement signalée sur vos biens. Lorsqu'un locataire signale un problème, il s'affichera ici.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-6">
+                  {tickets.map(ticket => (
+                    <div key={ticket.id} className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm text-left flex flex-col justify-between hover:shadow-md transition-shadow">
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-start gap-4">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            ticket.priority === 'Urgente' || ticket.priority === 'Haute' ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            Priorité {ticket.priority}
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-full bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider">
+                            {ticket.status}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1">
+                          <h3 className="text-base font-bold text-slate-900">{ticket.title}</h3>
+                          <span className="text-xs font-semibold text-amber-600 block">{ticket.property.name}</span>
+                          <p className="text-xs text-slate-500 leading-relaxed pt-2">{ticket.description}</p>
+                        </div>
+
+                        <div className="p-3 bg-slate-50 rounded-2xl text-xs space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-slate-450">Prestataire :</span>
+                            <span className="font-semibold text-slate-800">{ticket.contractor_name || 'Non assigné'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-455">Coût estimé :</span>
+                            <span className="font-semibold text-slate-800 font-mono">{ticket.cost.toLocaleString()} {currentAgency.currency}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-6 mt-4 border-t border-slate-100 flex gap-2">
+                        <button 
+                          onClick={() => { mockSupabase.updateTicketStatus(ticket.id, 'Résolu'); reloadData(); showToast("Ticket de maintenance résolu."); }}
+                          className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-center text-xs font-bold text-white transition-colors"
+                        >
+                          Marquer Résolu
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -2526,44 +2682,52 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {crmLeads.map(lead => (
-                        <tr key={lead.id}>
-                          <td className="py-4">
-                            <span className="font-bold text-slate-900 block">{lead.first_name} {lead.last_name}</span>
-                            <span className="text-xs text-slate-400 block">{lead.email}</span>
-                          </td>
-                          <td className="py-4 font-mono text-xs text-slate-700">{lead.phone}</td>
-                          <td className="py-4 text-xs">
-                            <span className="font-semibold text-slate-800 block">{lead.interest_type}</span>
-                            <span className="text-[10px] text-slate-400 font-mono">Budget max : {lead.budget?.toLocaleString()} {currentAgency.currency}</span>
-                          </td>
-                          <td className="py-4">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              lead.status === 'Gagné' ? 'bg-emerald-100 text-emerald-600' :
-                              lead.status === 'Proposition' ? 'bg-amber-100 text-amber-600' :
-                              'bg-slate-100 text-slate-600'
-                            }`}>
-                              {lead.status}
-                            </span>
-                          </td>
-                          <td className="py-4 text-right">
-                            <div className="flex gap-2 justify-end">
-                              <button
-                                onClick={() => { mockSupabase.updateLeadStatus(lead.id, 'Proposition'); reloadData(); showToast("Prospect déplacé à l'étape Proposition."); }}
-                                className="px-2.5 py-1.5 rounded-lg border border-slate-250 text-xs font-semibold text-slate-650 hover:bg-slate-50"
-                              >
-                                Proposition
-                              </button>
-                              <button
-                                onClick={() => { mockSupabase.updateLeadStatus(lead.id, 'Gagné'); reloadData(); showToast("Proposition acceptée ! Prospect marqué Gagné."); }}
-                                className="px-2.5 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-bold"
-                              >
-                                Gagné
-                              </button>
-                            </div>
+                      {crmLeads.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center text-slate-400 text-xs italic">
+                            Aucun prospect qualifié. Utilisez le bouton ci-dessus pour qualifier une nouvelle demande.
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        crmLeads.map(lead => (
+                          <tr key={lead.id}>
+                            <td className="py-4">
+                              <span className="font-bold text-slate-900 block">{lead.first_name} {lead.last_name}</span>
+                              <span className="text-xs text-slate-400 block">{lead.email}</span>
+                            </td>
+                            <td className="py-4 font-mono text-xs text-slate-700">{lead.phone}</td>
+                            <td className="py-4 text-xs">
+                              <span className="font-semibold text-slate-800 block">{lead.interest_type}</span>
+                              <span className="text-[10px] text-slate-400 font-mono">Budget max : {lead.budget?.toLocaleString()} {currentAgency.currency}</span>
+                            </td>
+                            <td className="py-4">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                lead.status === 'Gagné' ? 'bg-emerald-100 text-emerald-600' :
+                                lead.status === 'Proposition' ? 'bg-amber-100 text-amber-600' :
+                                'bg-slate-100 text-slate-600'
+                              }`}>
+                                {lead.status}
+                              </span>
+                            </td>
+                            <td className="py-4 text-right">
+                              <div className="flex gap-2 justify-end">
+                                <button
+                                  onClick={() => { mockSupabase.updateLeadStatus(lead.id, 'Proposition'); reloadData(); showToast("Prospect déplacé à l'étape Proposition."); }}
+                                  className="px-2.5 py-1.5 rounded-lg border border-slate-250 text-xs font-semibold text-slate-650 hover:bg-slate-50"
+                                >
+                                  Proposition
+                                </button>
+                                <button
+                                  onClick={() => { mockSupabase.updateLeadStatus(lead.id, 'Gagné'); reloadData(); showToast("Proposition acceptée ! Prospect marqué Gagné."); }}
+                                  className="px-2.5 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-bold"
+                                >
+                                  Gagné
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -2592,53 +2756,64 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {socialApps.map(app => (
-                        <tr key={app.id}>
-                          <td className="py-4">
-                            <span className="font-bold text-slate-900 block">{app.beneficiary_first_name} {app.beneficiary_last_name}</span>
-                            <span className="text-xs font-mono text-slate-400 block">CNI: {app.beneficiary_national_id}</span>
-                          </td>
-                          <td className="py-4 font-mono font-bold text-slate-700">
-                            {app.monthly_income.toLocaleString()} FCFA
-                          </td>
-                          <td className="py-4 text-xs font-semibold text-slate-600">
-                            {app.family_size} personnes
-                          </td>
-                          <td className="py-4">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              app.eligibility_status === 'Attribué' ? 'bg-emerald-100 text-emerald-600' :
-                              app.eligibility_status === 'Éligible' ? 'bg-blue-100 text-blue-600' :
-                              'bg-amber-100 text-amber-600'
-                            }`}>
-                              {app.eligibility_status}
-                            </span>
-                            {app.property && (
-                              <span className="block text-[10px] text-slate-400 mt-1 font-semibold">
-                                {app.property.name}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-4 text-right">
-                            {app.eligibility_status === 'Éligible' ? (
-                              <button
-                                onClick={() => {
-                                  // Trouver le premier bien social disponible (p1111114 ou autre disponible)
-                                  mockSupabase.attributeSocialHousing(app.id, 'p1111114-1111-1111-1111-111111111114');
-                                  reloadData();
-                                  showToast("Logement attribué avec succès à la famille.");
-                                }}
-                                className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all"
-                              >
-                                Attribuer Villa
-                              </button>
-                            ) : app.eligibility_status === 'Attribué' ? (
-                              <span className="text-xs text-slate-400 italic">Logement finalisé</span>
-                            ) : (
-                              <span className="text-xs text-slate-400">En cours d'étude</span>
-                            )}
+                      {socialApps.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-12 text-center text-slate-500 font-medium">
+                            <div className="flex flex-col items-center justify-center gap-3 py-6">
+                              <Building2 className="w-12 h-12 text-slate-350 animate-pulse" />
+                              <span className="text-sm text-slate-500">Aucune demande de logement social enregistrée.</span>
+                            </div>
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        socialApps.map(app => (
+                          <tr key={app.id}>
+                            <td className="py-4">
+                              <span className="font-bold text-slate-900 block">{app.beneficiary_first_name} {app.beneficiary_last_name}</span>
+                              <span className="text-xs font-mono text-slate-400 block">CNI: {app.beneficiary_national_id}</span>
+                            </td>
+                            <td className="py-4 font-mono font-bold text-slate-700">
+                              {app.monthly_income.toLocaleString()} FCFA
+                            </td>
+                            <td className="py-4 text-xs font-semibold text-slate-600">
+                              {app.family_size} personnes
+                            </td>
+                            <td className="py-4">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                app.eligibility_status === 'Attribué' ? 'bg-emerald-100 text-emerald-600' :
+                                app.eligibility_status === 'Éligible' ? 'bg-blue-100 text-blue-600' :
+                                'bg-amber-100 text-amber-600'
+                              }`}>
+                                {app.eligibility_status}
+                              </span>
+                              {app.property && (
+                                <span className="block text-[10px] text-slate-400 mt-1 font-semibold">
+                                  {app.property.name}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-4 text-right">
+                              {app.eligibility_status === 'Éligible' ? (
+                                <button
+                                  onClick={() => {
+                                    // Trouver le premier bien social disponible (p1111114 ou autre disponible)
+                                    mockSupabase.attributeSocialHousing(app.id, 'p1111114-1111-1111-1111-111111111114');
+                                    reloadData();
+                                    showToast("Logement attribué avec succès à la famille.");
+                                  }}
+                                  className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all"
+                                >
+                                  Attribuer Villa
+                                </button>
+                              ) : app.eligibility_status === 'Attribué' ? (
+                                <span className="text-xs text-slate-400 italic">Logement finalisé</span>
+                              ) : (
+                                <span className="text-xs text-slate-400">En cours d'étude</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>

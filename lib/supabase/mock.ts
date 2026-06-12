@@ -201,6 +201,76 @@ let db_crm_leads: CRMLead[] = [];
 let db_social_housing: SocialHousingApplication[] = [];
 let db_sales: SaleTransaction[] = [];
 
+const isClient = typeof window !== 'undefined';
+
+export function saveToStorage() {
+  if (!isClient) return;
+  try {
+    localStorage.setItem('immo360_db_agencies', JSON.stringify(db_agencies));
+    localStorage.setItem('immo360_db_profiles', JSON.stringify(db_profiles));
+    localStorage.setItem('immo360_db_landlords', JSON.stringify(db_landlords));
+    localStorage.setItem('immo360_db_properties', JSON.stringify(db_properties));
+    localStorage.setItem('immo360_db_tenants', JSON.stringify(db_tenants));
+    localStorage.setItem('immo360_db_leases', JSON.stringify(db_leases));
+    localStorage.setItem('immo360_db_payments', JSON.stringify(db_payments));
+    localStorage.setItem('immo360_db_receipts', JSON.stringify(db_receipts));
+    localStorage.setItem('immo360_db_maintenance_tickets', JSON.stringify(db_maintenance_tickets));
+    localStorage.setItem('immo360_db_crm_leads', JSON.stringify(db_crm_leads));
+    localStorage.setItem('immo360_db_social_housing', JSON.stringify(db_social_housing));
+    localStorage.setItem('immo360_db_sales', JSON.stringify(db_sales));
+  } catch (e) {
+    console.error("Error saving mock database to localStorage", e);
+  }
+}
+
+export function loadFromStorage(): boolean {
+  if (!isClient) return false;
+  try {
+    const agencies = localStorage.getItem('immo360_db_agencies');
+    if (!agencies) return false;
+    
+    db_agencies = JSON.parse(agencies);
+    
+    const profiles = localStorage.getItem('immo360_db_profiles');
+    if (profiles) db_profiles = JSON.parse(profiles);
+    
+    const landlords = localStorage.getItem('immo360_db_landlords');
+    if (landlords) db_landlords = JSON.parse(landlords);
+    
+    const properties = localStorage.getItem('immo360_db_properties');
+    if (properties) db_properties = JSON.parse(properties);
+    
+    const tenants = localStorage.getItem('immo360_db_tenants');
+    if (tenants) db_tenants = JSON.parse(tenants);
+    
+    const leases = localStorage.getItem('immo360_db_leases');
+    if (leases) db_leases = JSON.parse(leases);
+    
+    const payments = localStorage.getItem('immo360_db_payments');
+    if (payments) db_payments = JSON.parse(payments);
+    
+    const receipts = localStorage.getItem('immo360_db_receipts');
+    if (receipts) db_receipts = JSON.parse(receipts);
+    
+    const tickets = localStorage.getItem('immo360_db_maintenance_tickets');
+    if (tickets) db_maintenance_tickets = JSON.parse(tickets);
+    
+    const leads = localStorage.getItem('immo360_db_crm_leads');
+    if (leads) db_crm_leads = JSON.parse(leads);
+    
+    const social = localStorage.getItem('immo360_db_social_housing');
+    if (social) db_social_housing = JSON.parse(social);
+    
+    const sales = localStorage.getItem('immo360_db_sales');
+    if (sales) db_sales = JSON.parse(sales);
+    
+    return true;
+  } catch (e) {
+    console.error("Error loading mock database from localStorage", e);
+  }
+  return false;
+}
+
 // CLIENT SIMULÉ API (GETTER/SETTERS REACTIFS EN MEMOIRE)
 export const mockSupabase = {
   // Session active (simulation)
@@ -234,6 +304,7 @@ export const mockSupabase = {
       this.generateDemoDataForAgency(newAgency.id, newAgency.country);
     }
 
+    saveToStorage();
     return { agency: newAgency, profile: newProfile };
   },
 
@@ -411,6 +482,14 @@ export const mockSupabase = {
     db_maintenance_tickets.push(ticket);
   },
 
+  getProfileByEmail(email: string): Profile | undefined {
+    return db_profiles.find(p => p.email.toLowerCase() === email.toLowerCase());
+  },
+
+  getProfiles(): Profile[] {
+    return db_profiles;
+  },
+
   getAgency(): Agency {
     const found = db_agencies.find(a => a.id === this.activeAgencyId) || db_agencies[0];
     if (found) return found;
@@ -440,11 +519,13 @@ export const mockSupabase = {
       status: agency.status || 'Actif'
     };
     db_agencies.push(newAgency);
+    saveToStorage();
     return newAgency;
   },
 
   updateAgencyStatus(agencyId: string, status: Agency['status']) {
     db_agencies = db_agencies.map(a => a.id === agencyId ? { ...a, status } : a);
+    saveToStorage();
   },
 
   // PROPERTIES
@@ -459,11 +540,13 @@ export const mockSupabase = {
       agency_id: this.activeAgencyId
     };
     db_properties.unshift(newProperty);
+    saveToStorage();
     return newProperty;
   },
 
   updatePropertyStatus(propertyId: string, status: Property['status']) {
     db_properties = db_properties.map(p => p.id === propertyId ? { ...p, status } : p);
+    saveToStorage();
   },
 
   // LANDLORDS
@@ -478,6 +561,7 @@ export const mockSupabase = {
       agency_id: this.activeAgencyId
     };
     db_landlords.unshift(newLandlord);
+    saveToStorage();
     return newLandlord;
   },
 
@@ -493,6 +577,7 @@ export const mockSupabase = {
       agency_id: this.activeAgencyId
     };
     db_tenants.unshift(newTenant);
+    saveToStorage();
     return newTenant;
   },
 
@@ -516,6 +601,7 @@ export const mockSupabase = {
     };
     db_leases.unshift(newLease);
     this.updatePropertyStatus(lease.property_id, 'Occupé');
+    saveToStorage();
     return newLease;
   },
 
@@ -556,6 +642,7 @@ export const mockSupabase = {
       };
       db_receipts.push(newReceipt);
     }
+    saveToStorage();
   },
 
   // RECEIPTS
@@ -595,11 +682,13 @@ export const mockSupabase = {
       created_at: new Date().toISOString()
     };
     db_maintenance_tickets.unshift(newTicket);
+    saveToStorage();
     return newTicket;
   },
 
   updateTicketStatus(ticketId: string, status: MaintenanceTicket['status']) {
     db_maintenance_tickets = db_maintenance_tickets.map(t => t.id === ticketId ? { ...t, status } : t);
+    saveToStorage();
   },
 
   // CRM
@@ -615,11 +704,13 @@ export const mockSupabase = {
       created_at: new Date().toISOString()
     };
     db_crm_leads.unshift(newLead);
+    saveToStorage();
     return newLead;
   },
 
   updateLeadStatus(leadId: string, status: CRMLead['status']) {
     db_crm_leads = db_crm_leads.map(c => c.id === leadId ? { ...c, status } : c);
+    saveToStorage();
   },
 
   // SOCIAL HOUSING
@@ -644,6 +735,7 @@ export const mockSupabase = {
       created_at: new Date().toISOString()
     };
     db_social_housing.unshift(newApp);
+    saveToStorage();
     return newApp;
   },
 
@@ -654,6 +746,7 @@ export const mockSupabase = {
         : s
     );
     this.updatePropertyStatus(propertyId, 'Occupé');
+    saveToStorage();
   },
 
   // SALES & TRANSACTIONS
@@ -682,9 +775,14 @@ export const mockSupabase = {
     };
     db_sales.unshift(newTx);
     this.updatePropertyStatus(transaction.property_id, 'Vendu');
+    saveToStorage();
     return newTx;
   }
 };
 
-// Pré-remplissage des données de démo pour le compte d'agence par défaut Kafana
-mockSupabase.generateDemoDataForAgency('a-kafana', "Côte d'Ivoire");
+const loaded = loadFromStorage();
+if (!loaded) {
+  // Pré-remplissage des données de démo pour le compte d'agence par défaut Kafana
+  mockSupabase.generateDemoDataForAgency('a-kafana', "Côte d'Ivoire");
+  saveToStorage();
+}
