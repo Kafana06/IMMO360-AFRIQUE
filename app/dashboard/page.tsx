@@ -385,7 +385,13 @@ export default function DashboardPage() {
 
   const handleSecretLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (secretPassword === '360owner' || secretPassword === 'admin') {
+    const passLower = secretPassword.trim().toLowerCase();
+    if (
+      secretPassword === '360owner' || 
+      secretPassword === 'admin' || 
+      secretPassword === 'Kafana0605@' || 
+      passLower === 'kafana'
+    ) {
       setUserRole('super_admin');
       setActiveMenu('saas');
       setShowRoleSwitcher(true);
@@ -426,9 +432,12 @@ export default function DashboardPage() {
       }
     }
 
-    // Keyboard shortcut listener (Ctrl + Shift + P)
+    // Keyboard shortcut listener (Ctrl + Shift + P / Ctrl + Alt + S)
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'p') {
+      if (
+        (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'p') ||
+        (e.ctrlKey && e.altKey && e.key.toLowerCase() === 's')
+      ) {
         e.preventDefault();
         setSecretLoginOpen(true);
         setSecretError(null);
@@ -704,7 +713,10 @@ export default function DashboardPage() {
             >
               <Building2 className="w-6 h-6 text-slate-950 stroke-[2.5]" />
             </div>
-            <h1 className="font-title text-xl font-extrabold text-white tracking-tight">
+            <h1 
+              onClick={handleLogoClick}
+              className="font-title text-xl font-extrabold text-white tracking-tight cursor-pointer select-none"
+            >
               IMMO<span className="text-amber-500">360</span> AFRIQUE
             </h1>
             <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wider font-mono">Espace de Gestion Professionnel</p>
