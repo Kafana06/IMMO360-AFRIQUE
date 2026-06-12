@@ -434,10 +434,22 @@ export default function DashboardPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const email = sessionStorage.getItem('immo360_user_email');
-      if (email === 'admin.teranga@immo360.africa') {
-        mockSupabase.setActiveAgency('a2222222-2222-2222-2222-222222222222');
+      const agenciesList = mockSupabase.getAgencies();
+      if (email) {
+        const found = agenciesList.find(a => a.email.toLowerCase() === email.toLowerCase());
+        if (found) {
+          mockSupabase.setActiveAgency(found.id);
+        } else if (agenciesList.length > 0) {
+          mockSupabase.setActiveAgency(agenciesList[0].id);
+        } else {
+          mockSupabase.setActiveAgency('');
+        }
       } else {
-        mockSupabase.setActiveAgency('a1111111-1111-1111-1111-111111111111');
+        if (agenciesList.length > 0) {
+          mockSupabase.setActiveAgency(agenciesList[0].id);
+        } else {
+          mockSupabase.setActiveAgency('');
+        }
       }
     }
     reloadData();
