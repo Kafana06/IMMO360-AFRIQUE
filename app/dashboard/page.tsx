@@ -28,7 +28,9 @@ import {
   Filter,
   LogOut,
   MapPin,
-  Sparkles
+  Sparkles,
+  Lock,
+  Mail
 } from 'lucide-react';
 import { mockSupabase, Agency, Property, Landlord, Tenant, Lease, Payment, Receipt, MaintenanceTicket, CRMLead, SocialHousingApplication, SaleTransaction } from '@/lib/supabase/mock';
 import Link from 'next/link';
@@ -188,6 +190,54 @@ export default function DashboardPage() {
     }, 4000);
   };
 
+  // Authentification agence
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('immo360_authenticated') === 'true';
+    }
+    return false;
+  });
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError(null);
+
+    setTimeout(() => {
+      const emailLower = loginEmail.trim().toLowerCase();
+      const pass = loginPassword.trim();
+
+      if (pass !== 'password' && pass !== 'admin' && pass !== '123456') {
+        setLoginError("Mot de passe incorrect (utilisez 'password')");
+        setLoginLoading(false);
+        return;
+      }
+
+      if (emailLower === 'admin.babi@immo360.africa') {
+        mockSupabase.setActiveAgency('a1111111-1111-1111-1111-111111111111');
+        setIsAuthenticated(true);
+        sessionStorage.setItem('immo360_authenticated', 'true');
+        sessionStorage.setItem('immo360_user_email', emailLower);
+        reloadData();
+        showToast("Connexion réussie : Bienvenue chez Babi Immo S.A.");
+      } else if (emailLower === 'admin.teranga@immo360.africa') {
+        mockSupabase.setActiveAgency('a2222222-2222-2222-2222-222222222222');
+        setIsAuthenticated(true);
+        sessionStorage.setItem('immo360_authenticated', 'true');
+        sessionStorage.setItem('immo360_user_email', emailLower);
+        reloadData();
+        showToast("Connexion réussie : Bienvenue chez Teranga Agence Luxe");
+      } else {
+        setLoginError("Email non reconnu. Utilisez 'admin.babi@immo360.africa' ou 'admin.teranga@immo360.africa'");
+      }
+      setLoginLoading(false);
+    }, 800);
+  };
+
   const [logoClicks, setLogoClicks] = useState(0);
   const handleLogoClick = () => {
     setLogoClicks(prev => {
@@ -257,6 +307,14 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const email = sessionStorage.getItem('immo360_user_email');
+      if (email === 'admin.teranga@immo360.africa') {
+        mockSupabase.setActiveAgency('a2222222-2222-2222-2222-222222222222');
+      } else {
+        mockSupabase.setActiveAgency('a1111111-1111-1111-1111-111111111111');
+      }
+    }
     reloadData();
   }, []);
 
@@ -466,6 +524,151 @@ export default function DashboardPage() {
     const matchesStatus = selectedStatusFilter === 'Tous' || prop.status === selectedStatusFilter;
     return matchesType && matchesStatus;
   });
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center relative overflow-hidden font-sans select-none selection:bg-amber-500 selection:text-slate-900">
+        {/* Background decorative gradients */}
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-500/15 rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-slate-800/30 rounded-full blur-[160px] pointer-events-none" />
+        
+        {/* Animated grid decorative background */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-[0.15] pointer-events-none" />
+
+        <div className="relative z-10 w-full max-w-md p-6">
+          {/* Logo / Title */}
+          <div className="flex flex-col items-center mb-8 text-center animate-fadeIn">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center shadow-2xl shadow-amber-500/20 mb-4">
+              <Building2 className="w-7 h-7 text-slate-950 stroke-[2.5]" />
+            </div>
+            <h1 className="font-title text-2xl font-extrabold text-white tracking-tight">
+              IMMO<span className="text-amber-500">360</span> AFRIQUE
+            </h1>
+            <p className="text-xs text-slate-400 mt-1 uppercase tracking-wider font-mono">Espace de Gestion Professionnel</p>
+          </div>
+
+          {/* Login Card */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden"
+          >
+            <h2 className="text-lg font-bold text-white mb-2">Connexion</h2>
+            <p className="text-xs text-slate-400 mb-6">Accédez au tableau de bord multi-tenant de votre agence immobilière.</p>
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              {loginError && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2"
+                >
+                  <XCircle className="w-4 h-4 shrink-0" />
+                  <span>{loginError}</span>
+                </motion.div>
+              )}
+
+              <div>
+                <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Adresse Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-3.5 w-4 h-4 text-slate-500" />
+                  <input
+                    type="email"
+                    required
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="admin.babi@immo360.africa"
+                    className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-11 pr-4 py-2.5 text-xs text-white focus:outline-none transition-all font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Mot de passe</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-3.5 w-4 h-4 text-slate-500" />
+                  <input
+                    type="password"
+                    required
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-11 pr-4 py-2.5 text-xs text-white focus:outline-none transition-all font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={loginLoading}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:from-slate-800 disabled:to-slate-800 text-slate-950 disabled:text-slate-500 font-bold text-xs shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer border-none"
+                >
+                  {loginLoading ? (
+                    <div className="w-4 h-4 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
+                  ) : (
+                    <span>Se connecter</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+
+          {/* Accounts Demo helper card */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="mt-6 p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10 text-slate-400 text-xs space-y-3"
+          >
+            <div className="flex items-center gap-2 text-amber-500 font-bold uppercase tracking-wider text-[10px]">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Accès Démo Interactif</span>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Pour des raisons de test, connectez-vous avec l'un des comptes préconfigurés :
+            </p>
+            <div className="space-y-1.5 font-mono text-[10px] text-slate-350">
+              <div 
+                className="p-2 bg-slate-950/40 border border-slate-900 rounded-lg hover:border-amber-500/30 cursor-pointer transition-colors"
+                onClick={() => {
+                  setLoginEmail('admin.babi@immo360.africa');
+                  setLoginPassword('password');
+                }}
+              >
+                <div className="font-bold text-amber-450 text-[9px] uppercase tracking-wider">🇨🇮 Babi Immo S.A. (Abidjan)</div>
+                <div>Email : <span className="text-white select-all">admin.babi@immo360.africa</span></div>
+              </div>
+              
+              <div 
+                className="p-2 bg-slate-950/40 border border-slate-900 rounded-lg hover:border-amber-500/30 cursor-pointer transition-colors"
+                onClick={() => {
+                  setLoginEmail('admin.teranga@immo360.africa');
+                  setLoginPassword('password');
+                }}
+              >
+                <div className="font-bold text-amber-450 text-[9px] uppercase tracking-wider">🇸🇳 Teranga Agence (Dakar)</div>
+                <div>Email : <span className="text-white select-all">admin.teranga@immo360.africa</span></div>
+              </div>
+              <div className="text-[9px] text-slate-500 text-center pt-1 italic">
+                Mot de passe pour les deux comptes : <span className="text-white font-bold select-all">password</span> (ou cliquez sur un compte ci-dessus)
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Back to Home link */}
+          <div className="text-center mt-6">
+            <Link 
+              href="/"
+              className="text-xs text-slate-500 hover:text-slate-350 transition-colors underline underline-offset-4"
+            >
+              Retour à l'accueil
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
@@ -715,6 +918,11 @@ export default function DashboardPage() {
             </button>
             <Link
               href="/"
+              onClick={() => {
+                sessionStorage.removeItem('immo360_authenticated');
+                sessionStorage.removeItem('immo360_user_email');
+                setIsAuthenticated(false);
+              }}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
             >
               <LogOut className="w-4 h-4" />
@@ -918,6 +1126,12 @@ export default function DashboardPage() {
                   </button>
                   <Link
                     href="/"
+                    onClick={() => {
+                      sessionStorage.removeItem('immo360_authenticated');
+                      sessionStorage.removeItem('immo360_user_email');
+                      setIsAuthenticated(false);
+                      setMobileMenuOpen(false);
+                    }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-rose-600"
                   >
                     <LogOut className="w-4 h-4" />
