@@ -11,6 +11,23 @@ export interface Agency {
   email: string;
   plan?: 'Standard' | 'Premium' | 'VIP';
   status?: 'Actif' | 'Suspendu';
+  created_at?: string;
+  trial_ends_at?: string;
+}
+
+export interface SaaSPlanSettings {
+  standard_price: number;
+  premium_price: number;
+  vip_price: number;
+  trial_days: number;
+}
+
+export interface SaaSDiscountCoupon {
+  id: string;
+  code: string;
+  discount_type: 'percent' | 'fixed';
+  value: number;
+  status: 'Actif' | 'Expiré';
 }
 
 export interface Profile {
@@ -176,7 +193,9 @@ let db_agencies: Agency[] = [
     phone: '+225 07 89 01 23 45',
     email: 'kafanafousseni@gmail.com',
     plan: 'Standard',
-    status: 'Actif'
+    status: 'Actif',
+    created_at: new Date('2026-06-01T08:00:00Z').toISOString(),
+    trial_ends_at: new Date('2026-06-15T08:00:00Z').toISOString()
   }
 ];
 let db_profiles: Profile[] = [
@@ -201,6 +220,19 @@ let db_crm_leads: CRMLead[] = [];
 let db_social_housing: SocialHousingApplication[] = [];
 let db_sales: SaleTransaction[] = [];
 
+let saas_plans: SaaSPlanSettings = {
+  standard_price: 15000,
+  premium_price: 25000,
+  vip_price: 50000,
+  trial_days: 14
+};
+
+let db_coupons: SaaSDiscountCoupon[] = [
+  { id: 'c-welcome10', code: 'WELCOME10', discount_type: 'percent', value: 10, status: 'Actif' },
+  { id: 'c-free30', code: 'FREE30', discount_type: 'percent', value: 30, status: 'Actif' },
+  { id: 'c-immo5k', code: 'IMMO5K', discount_type: 'fixed', value: 5000, status: 'Actif' }
+];
+
 const isClient = typeof window !== 'undefined';
 
 export function saveToStorage() {
@@ -218,6 +250,8 @@ export function saveToStorage() {
     localStorage.setItem('immo360_db_crm_leads', JSON.stringify(db_crm_leads));
     localStorage.setItem('immo360_db_social_housing', JSON.stringify(db_social_housing));
     localStorage.setItem('immo360_db_sales', JSON.stringify(db_sales));
+    localStorage.setItem('immo360_saas_plans', JSON.stringify(saas_plans));
+    localStorage.setItem('immo360_db_coupons', JSON.stringify(db_coupons));
   } catch (e) {
     console.error("Error saving mock database to localStorage", e);
   }
@@ -264,6 +298,12 @@ export function loadFromStorage(): boolean {
     const sales = localStorage.getItem('immo360_db_sales');
     if (sales) db_sales = JSON.parse(sales);
     
+    const plansStr = localStorage.getItem('immo360_saas_plans');
+    if (plansStr) saas_plans = JSON.parse(plansStr);
+    
+    const couponsStr = localStorage.getItem('immo360_db_coupons');
+    if (couponsStr) db_coupons = JSON.parse(couponsStr);
+    
     return true;
   } catch (e) {
     console.error("Error loading mock database from localStorage", e);
@@ -284,11 +324,17 @@ export const mockSupabase = {
   },
 
   registerAgency(agency: Omit<Agency, 'id'>, profile: Omit<Profile, 'id' | 'agency_id' | 'role'>, generateDemoData: boolean) {
+    const trialDays = saas_plans.trial_days;
+    const now = new Date();
+    const trialEnds = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+
     const newAgency: Agency = {
       ...agency,
       id: `a-${Math.random().toString(36).substr(2, 9)}`,
-      plan: 'Standard',
-      status: 'Actif'
+      plan: agency.plan || 'Standard',
+      status: 'Actif',
+      created_at: now.toISOString(),
+      trial_ends_at: trialEnds.toISOString()
     };
     db_agencies.push(newAgency);
 
@@ -306,6 +352,43 @@ export const mockSupabase = {
 
     saveToStorage();
     return { agency: newAgency, profile: newProfile };
+  },
+
+  getSaaSPlanSettings(): SaaSPlanSettings {
+    return saas_plans;
+  },
+
+  updateSaaSPlanSettings(settings: SaaSPlanSettings) {
+    saas_plans = settings;
+    saveToStorage();
+  },
+
+  getDiscountCoupons(): SaaSDiscountCoupon[] {
+    return db_coupons;
+  },
+
+  addDiscountCoupon(coupon: Omit<SaaSDiscountCoupon, 'id'>) {
+    const newCoupon: SaaSDiscountCoupon = {
+      ...coupon,
+      id: `coupon-${Math.random().toString(36).substr(2, 9)}`
+    };
+    db_coupons.unshift(newCoupon);
+    saveToStorage();
+    return newCoupon;
+  },
+
+  toggleCouponStatus(couponId: string) {
+    db_coupons = db_coupons.map(c => 
+      c.id === couponId 
+        ? { ...c, status: c.status === 'Actif' ? 'Expiré' : 'Actif' } 
+        : c
+    );
+    saveToStorage();
+  },
+
+  deleteDiscountCoupon(couponId: string) {
+    db_coupons = db_coupons.filter(c => c.id !== couponId);
+    saveToStorage();
   },
 
   generateDemoDataForAgency(agencyId: string, country: string) {
@@ -777,6 +860,18 @@ export const mockSupabase = {
     this.updatePropertyStatus(transaction.property_id, 'Vendu');
     saveToStorage();
     return newTx;
+  },
+
+  getGlobalAgenciesStats() {
+    const stats: { [agencyId: string]: { properties: number; leases: number; tenants: number } } = {};
+    db_agencies.forEach(agency => {
+      stats[agency.id] = {
+        properties: db_properties.filter(p => p.agency_id === agency.id).length,
+        leases: db_leases.filter(l => l.agency_id === agency.id).length,
+        tenants: db_tenants.filter(t => t.agency_id === agency.id).length
+      };
+    });
+    return stats;
   }
 };
 

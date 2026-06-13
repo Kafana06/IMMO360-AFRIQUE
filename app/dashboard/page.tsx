@@ -76,7 +76,7 @@ export default function DashboardPage() {
   const [billingIsLoading, setBillingIsLoading] = useState(false);
 
   // States pour les onglets de la console SaaS
-  const [saasTab, setSaasTab] = useState<'overview' | 'agencies' | 'commissions' | 'broadcast' | 'infrastructure'>('overview');
+  const [saasTab, setSaasTab] = useState<'overview' | 'agencies' | 'plans' | 'commissions' | 'broadcast' | 'infrastructure'>('overview');
 
   // States pour les annonces globales (broadcast)
   const [broadcastMessage, setBroadcastMessage] = useState<string>('Maintenance planifiée ce soir de 23h à 01h GMT pour optimisation des bases de données locales.');
@@ -234,6 +234,44 @@ export default function DashboardPage() {
   const [signupError, setSignupError] = useState<string | null>(null);
   const [signupLoading, setSignupLoading] = useState(false);
 
+  // États du tunnel d'inscription et de checkout
+  const [signupStep, setSignupStep] = useState<'form' | 'verification' | 'payment'>('form');
+  const [signupSelectedPlan, setSignupSelectedPlan] = useState<'Standard' | 'Premium' | 'VIP'>('Standard');
+  const [generatedCode, setGeneratedCode] = useState('');
+  const [userEnteredCode, setUserEnteredCode] = useState('');
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+
+  // États de paiement/checkout
+  const [promoCode, setPromoCode] = useState('');
+  const [promoDiscount, setPromoDiscount] = useState(0); 
+  const [promoDiscountType, setPromoDiscountType] = useState<'percent' | 'fixed'>('percent');
+  const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
+  const [checkoutPaymentMethod, setCheckoutPaymentMethod] = useState<'Wave' | 'Orange Money' | 'MTN Money' | 'Carte'>('Wave');
+  const [checkoutPhone, setCheckoutPhone] = useState('');
+  const [checkoutCardName, setCheckoutCardName] = useState('');
+  const [checkoutCardNum, setCheckoutCardNum] = useState('');
+  const [checkoutCardExpiry, setCheckoutCardExpiry] = useState('');
+  const [checkoutCardCvv, setCheckoutCardCvv] = useState('');
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  // SaaS global settings (loaded in reloadData/useEffect)
+  const [saasPlansSettings, setSaasPlansSettings] = useState<any>({
+    standard_price: 15000,
+    premium_price: 25000,
+    vip_price: 50000,
+    trial_days: 14
+  });
+  const [saasCoupons, setSaasCoupons] = useState<any[]>([]);
+  const [selectedSaasAgencyDetails, setSelectedSaasAgencyDetails] = useState<any | null>(null);
+  const [globalAgenciesStats, setGlobalAgenciesStats] = useState<any>({});
+  const [expandedAgencyId, setExpandedAgencyId] = useState<string | null>(null);
+
+  // Nouveau coupon form
+  const [newCouponCode, setNewCouponCode] = useState('');
+  const [newCouponType, setNewCouponType] = useState<'percent' | 'fixed'>('percent');
+  const [newCouponValue, setNewCouponValue] = useState(10);
+
   // Modals et formulaires pour Bailleurs et Locataires
   const [landlordModalOpen, setLandlordModalOpen] = useState(false);
   const [tenantModalOpen, setTenantModalOpen] = useState(false);
@@ -307,6 +345,36 @@ export default function DashboardPage() {
     }, 800);
   };
 
+  const getDynamicPlanPrice = (plan: string | undefined) => {
+    const settings = saasPlansSettings || { standard_price: 15000, premium_price: 25000, vip_price: 50000 };
+    if (plan === 'Standard') return settings.standard_price;
+    if (plan === 'Premium') return settings.premium_price;
+    if (plan === 'VIP') return settings.vip_price;
+    return 0;
+  };
+
+  const getCheckoutFinalPrice = () => {
+    const base = getDynamicPlanPrice(signupSelectedPlan);
+    if (!appliedCouponCode) return base;
+    if (promoDiscountType === 'percent') {
+      return Math.max(0, base - Math.round(base * (promoDiscount / 100)));
+    } else {
+      return Math.max(0, base - promoDiscount);
+    }
+  };
+
+  const applyPromoCode = () => {
+    const coupon = saasCoupons.find(c => c.code.toUpperCase() === promoCode.trim().toUpperCase() && c.status === 'Actif');
+    if (coupon) {
+      setAppliedCouponCode(coupon.code);
+      setPromoDiscount(coupon.value);
+      setPromoDiscountType(coupon.discount_type);
+      showToast(`Code promo ${coupon.code} appliqué avec succès !`);
+    } else {
+      showToast("Code promo invalide ou expiré.");
+    }
+  };
+
   const handleSignup = (e: React.FormEvent) => {
     e.preventDefault();
     setSignupLoading(true);
@@ -322,6 +390,36 @@ export default function DashboardPage() {
         return;
       }
 
+      // Générer le code de validation à 4 chiffres
+      const code = Math.floor(1000 + Math.random() * 9000).toString();
+      setGeneratedCode(code);
+      setSignupStep('verification');
+      setSignupLoading(false);
+
+      showToast(`[E-mail de validation] Code envoyé à ${signupEmail} : ${code}`);
+    }, 1000);
+  };
+
+  const handleVerifyCodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setVerificationError(null);
+
+    if (userEnteredCode.trim() === generatedCode) {
+      setSignupStep('payment');
+      showToast("E-mail vérifié avec succès. Veuillez choisir votre forfait.");
+    } else {
+      setVerificationError("Code de validation incorrect. Veuillez réessayer.");
+    }
+  };
+
+  const handleCheckoutSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCheckoutLoading(true);
+    setCheckoutError(null);
+
+    setTimeout(() => {
+      const emailLower = signupEmail.trim().toLowerCase();
+
       const agencyData = {
         name: signupAgencyName,
         logo_url: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=200&q=80',
@@ -329,7 +427,8 @@ export default function DashboardPage() {
         currency: signupCurrency,
         address: signupAddress,
         phone: signupPhone,
-        email: emailLower
+        email: emailLower,
+        plan: signupSelectedPlan
       };
 
       const profileData = {
@@ -339,6 +438,7 @@ export default function DashboardPage() {
         phone: signupUserPhone
       };
 
+      // Register
       const result = mockSupabase.registerAgency(agencyData, profileData, generateDemoData);
 
       mockSupabase.setActiveAgency(result.agency.id);
@@ -347,9 +447,15 @@ export default function DashboardPage() {
       sessionStorage.setItem('immo360_user_email', emailLower);
       reloadData();
 
-      showToast(`Compte créé avec succès ! Bienvenue.`);
-      setSignupLoading(false);
-    }, 1000);
+      showToast(`Compte d'agence activé avec succès ! Forfait ${signupSelectedPlan} activé.`);
+      setCheckoutLoading(false);
+      
+      // Reset
+      setSignupStep('form');
+      setPromoCode('');
+      setPromoDiscount(0);
+      setAppliedCouponCode(null);
+    }, 1500);
   };
 
   const handleAddLandlordSubmit = (e: React.FormEvent) => {
@@ -480,6 +586,9 @@ export default function DashboardPage() {
     setCrmLeads(mockSupabase.getCRMLeads());
     setSocialApps(mockSupabase.getSocialHousingApplications());
     setSales(mockSupabase.getSaleTransactions());
+    setSaasPlansSettings(mockSupabase.getSaaSPlanSettings());
+    setSaasCoupons(mockSupabase.getDiscountCoupons());
+    setGlobalAgenciesStats(mockSupabase.getGlobalAgenciesStats());
     reloadUserProfile();
   };
 
@@ -898,163 +1007,399 @@ export default function DashboardPage() {
                 exit={{ opacity: 0, x: -20 }}
                 className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden"
               >
-                <h2 className="text-lg font-bold text-white mb-2">Créer un compte d'agence</h2>
-                <p className="text-xs text-slate-400 mb-6">Enregistrez votre agence de gestion immobilière en 2 minutes.</p>
+                {signupStep === 'form' ? (
+                  <>
+                    <h2 className="text-lg font-bold text-white mb-2">Créer un compte d'agence</h2>
+                    <p className="text-xs text-slate-400 mb-6">Enregistrez votre agence de gestion immobilière en 2 minutes.</p>
 
-                <form onSubmit={handleSignup} className="space-y-4 text-left">
-                  {signupError && (
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2"
-                    >
-                      <XCircle className="w-4 h-4 shrink-0" />
-                      <span>{signupError}</span>
-                    </motion.div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Nom de l'agence *</label>
-                      <input
-                        type="text"
-                        required
-                        value={signupAgencyName}
-                        onChange={(e) => setSignupAgencyName(e.target.value)}
-                        placeholder="Ex: Kafana Gestion"
-                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Pays *</label>
-                      <select
-                        value={signupCountry}
-                        onChange={(e) => {
-                          setSignupCountry(e.target.value);
-                          setSignupCurrency(e.target.value === 'Sénégal' || e.target.value === "Côte d'Ivoire" ? 'FCFA' : 'EUR');
-                        }}
-                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all cursor-pointer"
-                      >
-                        <option value="Côte d'Ivoire">Côte d'Ivoire 🇨🇮</option>
-                        <option value="Sénégal">Sénégal 🇸🇳</option>
-                        <option value="Cameroun">Cameroun 🇨🇲</option>
-                        <option value="Gabon">Gabon 🇬🇦</option>
-                        <option value="France">France 🇫🇷</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Devise</label>
-                      <select
-                        value={signupCurrency}
-                        onChange={(e) => setSignupCurrency(e.target.value)}
-                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all cursor-pointer"
-                      >
-                        <option value="FCFA">FCFA (XOF/XAF)</option>
-                        <option value="EUR">Euro (€)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Téléphone Agence</label>
-                      <input
-                        type="text"
-                        value={signupPhone}
-                        onChange={(e) => setSignupPhone(e.target.value)}
-                        placeholder="Ex: +225 07..."
-                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Adresse Physique</label>
-                    <input
-                      type="text"
-                      value={signupAddress}
-                      onChange={(e) => setSignupAddress(e.target.value)}
-                      placeholder="Ex: Boulevard Hassan II, Dakar"
-                      className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all"
-                    />
-                  </div>
-
-                  <div className="border-t border-slate-800 pt-3 my-1">
-                    <span className="text-[10px] font-bold text-amber-500 block mb-2 uppercase tracking-wider">Compte Administrateur</span>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] text-slate-400 block mb-1 font-medium">Prénom *</label>
-                        <input
-                          type="text"
-                          required
-                          value={signupFirstName}
-                          onChange={(e) => setSignupFirstName(e.target.value)}
-                          placeholder="Jean"
-                          className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-slate-400 block mb-1 font-medium">Nom *</label>
-                        <input
-                          type="text"
-                          required
-                          value={signupLastName}
-                          onChange={(e) => setSignupLastName(e.target.value)}
-                          placeholder="Koffi"
-                          className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] text-slate-400 block mb-1.5 font-medium">Email *</label>
-                      <input
-                        type="email"
-                        required
-                        value={signupEmail}
-                        onChange={(e) => setSignupEmail(e.target.value)}
-                        placeholder="admin@monagence.com"
-                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-400 block mb-1.5 font-medium">Mot de passe *</label>
-                      <input
-                        type="password"
-                        required
-                        value={signupPassword}
-                        onChange={(e) => setSignupPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-2">
-                    <button
-                      type="submit"
-                      disabled={signupLoading}
-                      className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:from-slate-800 disabled:to-slate-800 text-slate-950 disabled:text-slate-500 font-bold text-xs shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer border-none"
-                    >
-                      {signupLoading ? (
-                        <div className="w-4 h-4 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
-                      ) : (
-                        <span>Créer mon compte & Accéder</span>
+                    <form onSubmit={handleSignup} className="space-y-4 text-left">
+                      {signupError && (
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2"
+                        >
+                          <XCircle className="w-4 h-4 shrink-0" />
+                          <span>{signupError}</span>
+                        </motion.div>
                       )}
-                    </button>
-                  </div>
-                </form>
 
-                <div className="text-center mt-6">
-                  <button 
-                    onClick={() => setAuthMode('login')}
-                    className="text-xs text-slate-450 hover:text-slate-350 transition-colors underline underline-offset-4 cursor-pointer"
-                  >
-                    Déjà inscrit ? Se connecter
-                  </button>
-                </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Nom de l'agence *</label>
+                          <input
+                            type="text"
+                            required
+                            value={signupAgencyName}
+                            onChange={(e) => setSignupAgencyName(e.target.value)}
+                            placeholder="Ex: Kafana Gestion"
+                            className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Pays *</label>
+                          <select
+                            value={signupCountry}
+                            onChange={(e) => {
+                              setSignupCountry(e.target.value);
+                              setSignupCurrency(e.target.value === 'Sénégal' || e.target.value === "Côte d'Ivoire" ? 'FCFA' : 'EUR');
+                            }}
+                            className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all cursor-pointer"
+                          >
+                            <option value="Côte d'Ivoire">Côte d'Ivoire 🇨🇮</option>
+                            <option value="Sénégal">Sénégal 🇸🇳</option>
+                            <option value="Cameroun">Cameroun 🇨🇲</option>
+                            <option value="Gabon">Gabon 🇬🇦</option>
+                            <option value="France">France 🇫🇷</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Devise</label>
+                          <select
+                            value={signupCurrency}
+                            onChange={(e) => setSignupCurrency(e.target.value)}
+                            className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all cursor-pointer"
+                          >
+                            <option value="FCFA">FCFA (XOF/XAF)</option>
+                            <option value="EUR">Euro (€)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Téléphone Agence</label>
+                          <input
+                            type="text"
+                            value={signupPhone}
+                            onChange={(e) => setSignupPhone(e.target.value)}
+                            placeholder="Ex: +225 07..."
+                            className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Adresse Physique</label>
+                        <input
+                          type="text"
+                          value={signupAddress}
+                          onChange={(e) => setSignupAddress(e.target.value)}
+                          placeholder="Ex: Boulevard Hassan II, Dakar"
+                          className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all"
+                        />
+                      </div>
+
+                      <div className="border-t border-slate-800 pt-3 my-1">
+                        <span className="text-[10px] font-bold text-amber-500 block mb-2 uppercase tracking-wider">Compte Administrateur</span>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-[10px] text-slate-400 block mb-1 font-medium">Prénom *</label>
+                            <input
+                              type="text"
+                              required
+                              value={signupFirstName}
+                              onChange={(e) => setSignupFirstName(e.target.value)}
+                              placeholder="Jean"
+                              className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 block mb-1 font-medium">Nom *</label>
+                            <input
+                              type="text"
+                              required
+                              value={signupLastName}
+                              onChange={(e) => setSignupLastName(e.target.value)}
+                              placeholder="Koffi"
+                              className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[10px] text-slate-400 block mb-1.5 font-medium">Email *</label>
+                          <input
+                            type="email"
+                            required
+                            value={signupEmail}
+                            onChange={(e) => setSignupEmail(e.target.value)}
+                            placeholder="admin@monagence.com"
+                            className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-400 block mb-1.5 font-medium">Mot de passe *</label>
+                          <input
+                            type="password"
+                            required
+                            value={signupPassword}
+                            onChange={(e) => setSignupPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-2">
+                        <button
+                          type="submit"
+                          disabled={signupLoading}
+                          className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:from-slate-800 disabled:to-slate-800 text-slate-950 disabled:text-slate-500 font-bold text-xs shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer border-none"
+                        >
+                          {signupLoading ? (
+                            <div className="w-4 h-4 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
+                          ) : (
+                            <span>Créer mon compte</span>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+
+                    <div className="text-center mt-6">
+                      <button 
+                        onClick={() => setAuthMode('login')}
+                        className="text-xs text-slate-450 hover:text-slate-350 transition-colors underline underline-offset-4 cursor-pointer"
+                      >
+                        Déjà inscrit ? Se connecter
+                      </button>
+                    </div>
+                  </>
+                ) : signupStep === 'verification' ? (
+                  <div>
+                    <h2 className="text-lg font-bold text-white mb-2">Validation de l'e-mail</h2>
+                    <p className="text-xs text-slate-400 mb-6">Un e-mail de validation contenant un code à 4 chiffres a été envoyé à <span className="text-white font-semibold font-mono">{signupEmail}</span>.</p>
+
+                    <form onSubmit={handleVerifyCodeSubmit} className="space-y-6 text-left">
+                      {verificationError && (
+                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+                          <XCircle className="w-4 h-4 shrink-0" />
+                          <span>{verificationError}</span>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Code de Validation (4 chiffres)</label>
+                        <input
+                          type="text"
+                          required
+                          maxLength={4}
+                          value={userEnteredCode}
+                          onChange={(e) => setUserEnteredCode(e.target.value)}
+                          placeholder="Ex: 1234"
+                          className="w-full text-center bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-3 text-lg font-bold text-white focus:outline-none transition-all tracking-widest font-mono"
+                        />
+                      </div>
+
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => { setSignupStep('form'); setVerificationError(null); }}
+                          className="w-1/3 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors cursor-pointer border-none"
+                        >
+                          Retour
+                        </button>
+                        <button
+                          type="submit"
+                          className="w-2/3 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-bold text-xs transition-all cursor-pointer border-none"
+                        >
+                          Valider le code
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <h2 className="text-lg font-bold text-white mb-1">Finalisez votre inscription</h2>
+                    <p className="text-xs text-slate-400 mb-4">Sélectionnez votre forfait et activez votre compte d'agence.</p>
+
+                    <form onSubmit={handleCheckoutSubmit} className="space-y-4 text-left">
+                      {checkoutError && (
+                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+                          <XCircle className="w-4 h-4 shrink-0" />
+                          <span>{checkoutError}</span>
+                        </div>
+                      )}
+
+                      {/* Plan Selector Grid */}
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { id: 'Standard', label: 'Standard', price: saasPlansSettings.standard_price, desc: 'Max 5 biens' },
+                          { id: 'Premium', label: 'Premium', price: saasPlansSettings.premium_price, desc: 'Max 15 biens' },
+                          { id: 'VIP', label: 'VIP', price: saasPlansSettings.vip_price, desc: 'Biens illimités' }
+                        ].map(plan => (
+                          <div 
+                            key={plan.id}
+                            onClick={() => setSignupSelectedPlan(plan.id as any)}
+                            className={`p-3 rounded-2xl border text-center cursor-pointer transition-all ${
+                              signupSelectedPlan === plan.id 
+                                ? 'bg-amber-500/10 border-amber-500 text-white shadow-lg shadow-amber-500/5' 
+                                : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
+                            }`}
+                          >
+                            <span className="block text-xs font-bold">{plan.label}</span>
+                            <span className="block text-[14px] font-bold font-mono text-amber-500 mt-1">{plan.price.toLocaleString()}</span>
+                            <span className="block text-[8px] text-slate-500 mt-1 font-semibold">{plan.desc}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Coupon Section */}
+                      <div className="bg-slate-950/30 border border-slate-800/80 rounded-2xl p-3 space-y-2">
+                        <label className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">Bon de réduction</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Ex: WELCOME10"
+                            value={promoCode}
+                            onChange={(e) => setPromoCode(e.target.value)}
+                            className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-1.5 text-xs text-white uppercase focus:outline-none transition-all font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={applyPromoCode}
+                            className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer border-none"
+                          >
+                            Appliquer
+                          </button>
+                        </div>
+                        {appliedCouponCode && (
+                          <span className="block text-[10px] text-emerald-400 font-semibold">
+                            ✓ Bon appliqué '{appliedCouponCode}' ({promoDiscountType === 'percent' ? `${promoDiscount}%` : `${promoDiscount.toLocaleString()} FCFA`} de réduction).
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Prices Summary */}
+                      <div className="p-3 bg-slate-950/50 rounded-2xl text-xs space-y-2 border border-slate-900">
+                        <div className="flex justify-between text-slate-400">
+                          <span>Prix de base :</span>
+                          <span className="font-mono text-white">{getDynamicPlanPrice(signupSelectedPlan).toLocaleString()} {signupCurrency}</span>
+                        </div>
+                        {appliedCouponCode && (
+                          <div className="flex justify-between text-emerald-400">
+                            <span>Réduction :</span>
+                            <span className="font-mono">
+                              -{promoDiscountType === 'percent' 
+                                ? `${(Math.round(getDynamicPlanPrice(signupSelectedPlan) * (promoDiscount / 100))).toLocaleString()} ${signupCurrency} (${promoDiscount}%)` 
+                                : `${promoDiscount.toLocaleString()} ${signupCurrency}`}
+                            </span>
+                          </div>
+                        )}
+                        <div className="border-t border-slate-800 pt-2 flex justify-between font-bold text-sm">
+                          <span className="text-slate-200">Total à payer :</span>
+                          <span className="font-mono text-amber-500">{getCheckoutFinalPrice().toLocaleString()} {signupCurrency}</span>
+                        </div>
+                      </div>
+
+                      {/* Payment Method Switcher */}
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">Moyen de Paiement</label>
+                        <div className="flex gap-1.5 border border-slate-850 p-1 rounded-xl bg-slate-950/40 text-[10px]">
+                          {(['Wave', 'Orange Money', 'MTN Money', 'Carte'] as const).map(method => (
+                            <button
+                              key={method}
+                              type="button"
+                              onClick={() => setCheckoutPaymentMethod(method)}
+                              className={`flex-1 py-1.5 rounded-lg font-bold transition-all border-none cursor-pointer ${
+                                checkoutPaymentMethod === method 
+                                  ? 'bg-amber-50 text-slate-950' 
+                                  : 'bg-transparent text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              {method}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Conditional fields based on Payment Method */}
+                      {checkoutPaymentMethod !== 'Carte' ? (
+                        <div>
+                          <label className="text-[10px] text-slate-400 block mb-1 font-medium font-mono">Numéro Mobile Money *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ex: +225 07 12 34 56 78"
+                            value={checkoutPhone}
+                            onChange={(e) => setCheckoutPhone(e.target.value)}
+                            className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all font-mono"
+                          />
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5">
+                          <div>
+                            <label className="text-[10px] text-slate-400 block mb-1 font-medium">Nom sur la carte *</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="Fousseni Kafana"
+                              value={checkoutCardName}
+                              onChange={(e) => setCheckoutCardName(e.target.value)}
+                              className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all"
+                            />
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="col-span-2">
+                              <label className="text-[10px] text-slate-400 block mb-1 font-medium">Numéro de carte *</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="4000 1234 5678 9010"
+                                value={checkoutCardNum}
+                                onChange={(e) => setCheckoutCardNum(e.target.value)}
+                                className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all font-mono"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-1 font-medium font-mono">CVV *</label>
+                              <input
+                                type="text"
+                                required
+                                maxLength={3}
+                                placeholder="123"
+                                value={checkoutCardCvv}
+                                onChange={(e) => setCheckoutCardCvv(e.target.value)}
+                                className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all font-mono"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Trial notice */}
+                      {saasPlansSettings.trial_days > 0 && (
+                        <div className="text-[10px] text-slate-400 bg-slate-950/40 p-2.5 rounded-xl border border-slate-900 text-left leading-relaxed">
+                          💡 <span className="text-amber-500 font-bold">Période d'essai gratuite de {saasPlansSettings.trial_days} jours activée</span>. Votre compte sera activé immédiatement et aucun prélèvement ne sera effectué avant le <span className="text-slate-200 font-semibold">{new Date(Date.now() + saasPlansSettings.trial_days * 24 * 60 * 60 * 1000).toLocaleDateString()}</span>.
+                        </div>
+                      )}
+
+                      {/* Submit / Action buttons */}
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => { setSignupStep('verification'); setCheckoutError(null); }}
+                          className="w-1/3 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors cursor-pointer border-none"
+                        >
+                          Retour
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={checkoutLoading}
+                          className="w-2/3 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:from-slate-850 disabled:to-slate-850 text-slate-950 disabled:text-slate-500 font-bold text-xs transition-all cursor-pointer border-none flex items-center justify-center gap-2"
+                        >
+                          {checkoutLoading ? (
+                            <div className="w-4 h-4 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
+                          ) : (
+                            <span>Confirmer & Activer</span>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -2896,6 +3241,7 @@ export default function DashboardPage() {
                 {[
                   { id: 'overview', label: "Vue d'ensemble & KPIs" },
                   { id: 'agencies', label: "Gestion des Agences (Tenants)" },
+                  { id: 'plans', label: "Tarifs & Codes Promo" },
                   { id: 'commissions', label: "Commissions & Loyers (2%)" },
                   { id: 'broadcast', label: "Alertes & Diffusion Globale" },
                   { id: 'infrastructure', label: "OHADA & Infrastructure" }
@@ -2929,11 +3275,7 @@ export default function DashboardPage() {
                         <span className="text-2xl font-bold font-mono text-amber-500">
                           {agencies.reduce((acc, a) => {
                             if (a.status === 'Suspendu') return acc;
-                            let cost = 0;
-                            if (a.plan === 'Standard') cost = 15000;
-                            else if (a.plan === 'Premium') cost = 25000;
-                            else if (a.plan === 'VIP') cost = 50000;
-                            return acc + cost;
+                            return acc + getDynamicPlanPrice(a.plan);
                           }, 0).toLocaleString()}
                         </span>
                         <span className="text-xs font-bold text-slate-400 font-mono">FCFA</span>
@@ -2953,7 +3295,7 @@ export default function DashboardPage() {
                         <span className="text-3xl font-extrabold text-slate-900 font-mono">{agencies.length}</span>
                         <span className="text-xs font-bold text-slate-400 pl-1">locataires</span>
                       </div>
-                      <div className="text-[9px] text-slate-450 mt-2 space-y-0.5 font-semibold">
+                      <div className="text-[9px] text-slate-455 mt-2 space-y-0.5 font-semibold">
                         <div>Actives : <span className="font-bold text-slate-700">{agencies.filter(a => a.status === 'Actif').length}</span> • Suspendues : <span className="font-bold text-slate-700">{agencies.filter(a => a.status === 'Suspendu').length}</span></div>
                         <div className="text-[8px] text-slate-400">Standard: {agencies.filter(a => a.plan === 'Standard').length} | Premium: {agencies.filter(a => a.plan === 'Premium').length} | VIP: {agencies.filter(a => a.plan === 'VIP').length}</div>
                       </div>
@@ -2970,11 +3312,7 @@ export default function DashboardPage() {
                           {Math.round(
                             agencies.reduce((acc, a) => {
                               if (a.status === 'Suspendu') return acc;
-                              let cost = 0;
-                              if (a.plan === 'Standard') cost = 15000;
-                              else if (a.plan === 'Premium') cost = 25000;
-                              else if (a.plan === 'VIP') cost = 50000;
-                              return acc + cost;
+                              return acc + getDynamicPlanPrice(a.plan);
                             }, 0) / (agencies.filter(a => a.status === 'Actif').length || 1)
                           ).toLocaleString()}
                         </span>
@@ -3162,21 +3500,21 @@ export default function DashboardPage() {
                         <h3 className="font-title text-base font-bold text-slate-900 mb-4">Répartition des Revenus</h3>
                         <div className="space-y-3 text-xs">
                           <div className="flex justify-between items-center p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                            <span className="font-bold text-slate-700">Plans VIP (50 000 F)</span>
+                            <span className="font-bold text-slate-700">Plans VIP ({getDynamicPlanPrice('VIP').toLocaleString()} F)</span>
                             <span className="font-mono text-purple-700 font-bold">
-                              {(agencies.filter(a => a.plan === 'VIP' && a.status !== 'Suspendu').length * 50000).toLocaleString()} F
+                              {(agencies.filter(a => a.plan === 'VIP' && a.status !== 'Suspendu').length * getDynamicPlanPrice('VIP')).toLocaleString()} F
                             </span>
                           </div>
                           <div className="flex justify-between items-center p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                            <span className="font-bold text-slate-700">Plans Premium (25 000 F)</span>
+                            <span className="font-bold text-slate-700">Plans Premium ({getDynamicPlanPrice('Premium').toLocaleString()} F)</span>
                             <span className="font-mono text-amber-600 font-bold">
-                              {(agencies.filter(a => a.plan === 'Premium' && a.status !== 'Suspendu').length * 25000).toLocaleString()} F
+                              {(agencies.filter(a => a.plan === 'Premium' && a.status !== 'Suspendu').length * getDynamicPlanPrice('Premium')).toLocaleString()} F
                             </span>
                           </div>
                           <div className="flex justify-between items-center p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                            <span className="font-bold text-slate-700">Plans Standard (15 000 F)</span>
+                            <span className="font-bold text-slate-700">Plans Standard ({getDynamicPlanPrice('Standard').toLocaleString()} F)</span>
                             <span className="font-mono text-slate-600 font-bold">
-                              {(agencies.filter(a => a.plan === 'Standard' && a.status !== 'Suspendu').length * 15000).toLocaleString()} F
+                              {(agencies.filter(a => a.plan === 'Standard' && a.status !== 'Suspendu').length * getDynamicPlanPrice('Standard')).toLocaleString()} F
                             </span>
                           </div>
                         </div>
@@ -3185,11 +3523,7 @@ export default function DashboardPage() {
                         Revenu récurrent annuel (ARR) estimé : <span className="font-bold font-mono text-slate-750">
                           {(agencies.reduce((acc, a) => {
                             if (a.status === 'Suspendu') return acc;
-                            let cost = 0;
-                            if (a.plan === 'Standard') cost = 15000;
-                            else if (a.plan === 'Premium') cost = 25000;
-                            else if (a.plan === 'VIP') cost = 50000;
-                            return acc + cost;
+                            return acc + getDynamicPlanPrice(a.plan);
                           }, 0) * 12).toLocaleString()} FCFA
                         </span>
                       </div>
@@ -3273,56 +3607,132 @@ export default function DashboardPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {agencies.map(agency => (
-                            <tr key={agency.id} className="hover:bg-slate-50 transition-colors">
-                              <td className="py-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-xl bg-slate-900 text-amber-500 flex items-center justify-center font-bold text-sm shrink-0 border border-slate-800">
-                                    {agency.name.substring(0, 2).toUpperCase()}
-                                  </div>
-                                  <div>
-                                    <span className="font-bold text-slate-900 block text-xs">{agency.name}</span>
-                                    <span className="text-[10px] text-slate-400 block">{agency.email}</span>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="py-4 text-xs font-semibold text-slate-700">
-                                {agency.country} 🇨🇮
-                                <span className="text-[9px] font-mono text-slate-400 block font-normal">{agency.currency}</span>
-                              </td>
-                              <td className="py-4">
-                                <select
-                                  value={agency.plan || 'Standard'}
-                                  onChange={(e) => updateAgencyPlan(agency.id, e.target.value as Agency['plan'])}
-                                  className="bg-slate-100 hover:bg-slate-200 border-0 rounded-xl px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
-                                >
-                                  <option value="Standard">Standard (15k)</option>
-                                  <option value="Premium">Premium (25k)</option>
-                                  <option value="VIP">VIP (50k)</option>
-                                </select>
-                              </td>
-                              <td className="py-4">
-                                <button
-                                  onClick={() => toggleAgencyStatus(agency.id, agency.status)}
-                                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                                    agency.status === 'Suspendu' 
-                                      ? 'bg-rose-100 text-rose-700 font-bold' 
-                                      : 'bg-emerald-100 text-emerald-700 font-bold'
-                                  }`}
-                                >
-                                  {agency.status || 'Actif'}
-                                </button>
-                              </td>
-                              <td className="py-4 text-right">
-                                <button
-                                  onClick={() => changeAgency(agency.id)}
-                                  className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] cursor-pointer"
-                                >
-                                  Incarner
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
+                          {agencies.map(agency => {
+                            const isExpanded = expandedAgencyId === agency.id;
+                            return (
+                              <React.Fragment key={agency.id}>
+                                <tr className="hover:bg-slate-50 transition-colors">
+                                  <td className="py-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 rounded-xl bg-slate-900 text-amber-500 flex items-center justify-center font-bold text-sm shrink-0 border border-slate-800">
+                                        {agency.name.substring(0, 2).toUpperCase()}
+                                      </div>
+                                      <div>
+                                        <span className="font-bold text-slate-900 block text-xs">{agency.name}</span>
+                                        <span className="text-[10px] text-slate-400 block">{agency.email}</span>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-4 text-xs font-semibold text-slate-700">
+                                    {agency.country} 🇨🇮
+                                    <span className="text-[9px] font-mono text-slate-400 block font-normal">{agency.currency}</span>
+                                  </td>
+                                  <td className="py-4">
+                                    <select
+                                      value={agency.plan || 'Standard'}
+                                      onChange={(e) => updateAgencyPlan(agency.id, e.target.value as Agency['plan'])}
+                                      className="bg-slate-100 hover:bg-slate-200 border-0 rounded-xl px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                                    >
+                                      <option value="Standard">Standard ({getDynamicPlanPrice('Standard').toLocaleString()} F)</option>
+                                      <option value="Premium">Premium ({getDynamicPlanPrice('Premium').toLocaleString()} F)</option>
+                                      <option value="VIP">VIP ({getDynamicPlanPrice('VIP').toLocaleString()} F)</option>
+                                    </select>
+                                  </td>
+                                  <td className="py-4">
+                                    <button
+                                      onClick={() => toggleAgencyStatus(agency.id, agency.status)}
+                                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                        agency.status === 'Suspendu' 
+                                          ? 'bg-rose-100 text-rose-700 font-bold' 
+                                          : 'bg-emerald-100 text-emerald-700 font-bold'
+                                      }`}
+                                    >
+                                      {agency.status || 'Actif'}
+                                    </button>
+                                  </td>
+                                  <td className="py-4 text-right">
+                                    <button
+                                      onClick={() => setExpandedAgencyId(isExpanded ? null : agency.id)}
+                                      className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[10px] cursor-pointer mr-1.5"
+                                    >
+                                      {isExpanded ? "Masquer" : "Détails"}
+                                    </button>
+                                    <button
+                                      onClick={() => changeAgency(agency.id)}
+                                      className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] cursor-pointer"
+                                    >
+                                      Incarner
+                                    </button>
+                                  </td>
+                                </tr>
+                                {isExpanded && (() => {
+                                  const adminProfile = mockSupabase.getProfiles().find(p => p.agency_id === agency.id && p.role === 'agency_admin') || 
+                                                       mockSupabase.getProfiles().find(p => p.agency_id === agency.id);
+                                  const stats = globalAgenciesStats[agency.id] || { properties: 0, leases: 0, tenants: 0 };
+                                  const createdDate = agency.created_at ? new Date(agency.created_at).toLocaleDateString() : 'N/A';
+                                  const trialEndsDate = agency.trial_ends_at ? new Date(agency.trial_ends_at).toLocaleDateString() : 'N/A';
+                                  const trialDaysLeft = agency.trial_ends_at 
+                                    ? Math.max(0, Math.ceil((new Date(agency.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+                                    : 0;
+
+                                  return (
+                                    <tr className="bg-slate-50/50">
+                                      <td colSpan={5} className="p-4 border-t border-slate-100">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                                          {/* Admin Info */}
+                                          <div className="bg-white p-3 rounded-2xl border border-slate-200">
+                                            <span className="font-bold text-slate-900 block mb-2 text-[10px] uppercase tracking-wider text-amber-500">Contact Administrateur</span>
+                                            <div className="space-y-1">
+                                              <p><span className="text-slate-400">Nom :</span> <span className="font-semibold text-slate-800">{adminProfile ? `${adminProfile.first_name} ${adminProfile.last_name}` : 'N/A'}</span></p>
+                                              <p><span className="text-slate-400">Tél :</span> <span className="font-semibold text-slate-800 font-mono">{adminProfile?.phone || agency.phone || 'N/A'}</span></p>
+                                              <p><span className="text-slate-400">Email :</span> <span className="font-semibold text-slate-800 font-mono">{adminProfile?.email || agency.email || 'N/A'}</span></p>
+                                            </div>
+                                          </div>
+
+                                          {/* Agency Settings */}
+                                          <div className="bg-white p-3 rounded-2xl border border-slate-200">
+                                            <span className="font-bold text-slate-900 block mb-2 text-[10px] uppercase tracking-wider text-amber-500">Détails & Abonnement</span>
+                                            <div className="space-y-1">
+                                              <p><span className="text-slate-400">Adresse :</span> <span className="font-semibold text-slate-850">{agency.address || 'N/A'}</span></p>
+                                              <p><span className="text-slate-400">Créé le :</span> <span className="font-semibold text-slate-850 font-mono">{createdDate}</span></p>
+                                              <p>
+                                                <span className="text-slate-400">Fin d'essai :</span>{' '}
+                                                <span className="font-semibold text-slate-850 font-mono">{trialEndsDate}</span>
+                                                {trialDaysLeft > 0 ? (
+                                                  <span className="ml-1.5 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] rounded-md font-bold">({trialDaysLeft}j restants)</span>
+                                                ) : (
+                                                  <span className="ml-1.5 px-1.5 py-0.5 bg-rose-50 text-rose-700 text-[9px] rounded-md font-bold">(Expirée)</span>
+                                                )}
+                                              </p>
+                                            </div>
+                                          </div>
+
+                                          {/* Live Stats */}
+                                          <div className="bg-white p-3 rounded-2xl border border-slate-200">
+                                            <span className="font-bold text-slate-900 block mb-2 text-[10px] uppercase tracking-wider text-amber-500">Statistiques d'Activité</span>
+                                            <div className="grid grid-cols-3 gap-2 text-center">
+                                              <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                                <span className="block text-lg font-bold font-mono text-slate-800">{stats.properties}</span>
+                                                <span className="text-[9px] text-slate-400 font-semibold block uppercase">Biens</span>
+                                              </div>
+                                              <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                                <span className="block text-lg font-bold font-mono text-slate-800">{stats.leases}</span>
+                                                <span className="text-[9px] text-slate-400 font-semibold block uppercase">Baux</span>
+                                              </div>
+                                              <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                                <span className="block text-lg font-bold font-mono text-slate-800">{stats.tenants}</span>
+                                                <span className="text-[9px] text-slate-400 font-semibold block uppercase">Locataires</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })()}
+                              </React.Fragment>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -3659,6 +4069,197 @@ export default function DashboardPage() {
                     </p>
                     <div className="text-[10px] text-slate-400 font-semibold">
                       Dernière vérification automatique : <span className="font-mono text-slate-600">il y a 5 min</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 6: PLAN PRICES & DISCOUNT COUPONS */}
+              {saasTab === 'plans' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-left animate-fadeIn">
+                  {/* Plan Prices Configurations */}
+                  <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm text-left">
+                    <h3 className="font-title text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+                      <DollarSign className="w-5 h-5 text-amber-500" />
+                      Configuration des Tarifs & Essai
+                    </h3>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      mockSupabase.updateSaaSPlanSettings(saasPlansSettings);
+                      reloadData();
+                      showToast("Configurations des plans mises à jour avec succès.");
+                    }} className="space-y-4 text-xs">
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1 font-bold">Tarif Mensuel Plan Standard (FCFA)</label>
+                        <input
+                          type="number"
+                          required
+                          value={saasPlansSettings.standard_price}
+                          onChange={(e) => setSaasPlansSettings({...saasPlansSettings, standard_price: parseInt(e.target.value) || 0})}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-mono font-bold text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1 font-bold">Tarif Mensuel Plan Premium (FCFA)</label>
+                        <input
+                          type="number"
+                          required
+                          value={saasPlansSettings.premium_price}
+                          onChange={(e) => setSaasPlansSettings({...saasPlansSettings, premium_price: parseInt(e.target.value) || 0})}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-mono font-bold text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1 font-bold">Tarif Mensuel Plan VIP (FCFA)</label>
+                        <input
+                          type="number"
+                          required
+                          value={saasPlansSettings.vip_price}
+                          onChange={(e) => setSaasPlansSettings({...saasPlansSettings, vip_price: parseInt(e.target.value) || 0})}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-mono font-bold text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1 font-bold">Période d'essai par défaut (Jours)</label>
+                        <input
+                          type="number"
+                          required
+                          value={saasPlansSettings.trial_days}
+                          onChange={(e) => setSaasPlansSettings({...saasPlansSettings, trial_days: parseInt(e.target.value) || 0})}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-mono font-bold text-xs"
+                        />
+                      </div>
+                      <button type="submit" className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl mt-2 transition-colors cursor-pointer border-none">
+                        Mettre à jour les configurations
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Coupons Management Table */}
+                  <div className="lg:col-span-2 p-6 rounded-3xl bg-white border border-slate-200 shadow-sm text-left">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="font-title text-base font-bold text-slate-900 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-amber-500" />
+                        Gestion des Bons de Réduction
+                      </h3>
+                      <span className="text-[10px] text-slate-400 font-semibold font-mono uppercase">Actifs : {saasCoupons.length}</span>
+                    </div>
+
+                    {/* Add Coupon Form */}
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newCouponCode.trim()) return;
+                      mockSupabase.addDiscountCoupon({
+                        code: newCouponCode.trim().toUpperCase(),
+                        discount_type: newCouponType,
+                        value: newCouponValue,
+                        status: 'Actif'
+                      });
+                      setNewCouponCode('');
+                      setNewCouponValue(10);
+                      reloadData();
+                      showToast("Bon de réduction créé avec succès.");
+                    }} className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-xs">
+                      <div>
+                        <label className="text-[9px] text-slate-400 font-bold block mb-1 uppercase">Code Promo</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: SPECIAL50"
+                          value={newCouponCode}
+                          onChange={(e) => setNewCouponCode(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-mono uppercase font-bold text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-slate-400 font-bold block mb-1 uppercase">Type</label>
+                        <select
+                          value={newCouponType}
+                          onChange={(e) => setNewCouponType(e.target.value as any)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-2 py-2 text-slate-900 focus:outline-none cursor-pointer"
+                        >
+                          <option value="percent">Pourcentage (%)</option>
+                          <option value="fixed">Montant Fixe (FCFA)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-slate-405 font-bold block mb-1 uppercase">Valeur</label>
+                        <input
+                          type="number"
+                          required
+                          value={newCouponValue}
+                          onChange={(e) => setNewCouponValue(parseInt(e.target.value) || 0)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-mono font-bold"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <button type="submit" className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl transition-colors cursor-pointer border-none">
+                          Ajouter le Bon
+                        </button>
+                      </div>
+                    </form>
+
+                    {/* Coupons List */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-slate-400 font-bold text-xs">
+                            <th className="pb-3 font-semibold text-left">Code</th>
+                            <th className="pb-3 font-semibold text-left">Type de Remise</th>
+                            <th className="pb-3 font-semibold text-left">Valeur</th>
+                            <th className="pb-3 font-semibold text-left">Statut</th>
+                            <th className="pb-3 font-semibold text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {saasCoupons.map(coupon => (
+                            <tr key={coupon.id} className="hover:bg-slate-55 transition-colors">
+                              <td className="py-3 font-mono font-bold text-slate-900">{coupon.code}</td>
+                              <td className="py-3 text-xs text-slate-500">
+                                {coupon.discount_type === 'percent' ? 'Pourcentage (%)' : 'Montant Fixe (FCFA)'}
+                              </td>
+                              <td className="py-3 font-mono font-bold text-slate-700">
+                                {coupon.discount_type === 'percent' ? `${coupon.value}%` : `${coupon.value.toLocaleString()} FCFA`}
+                              </td>
+                              <td className="py-3">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    mockSupabase.toggleCouponStatus(coupon.id);
+                                    reloadData();
+                                    showToast(`Statut du coupon ${coupon.code} modifié.`);
+                                  }}
+                                  className={`px-2 py-0.5 rounded-full text-[9px] font-bold cursor-pointer border-none ${
+                                    coupon.status === 'Actif' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                                  }`}
+                                >
+                                  {coupon.status}
+                                </button>
+                              </td>
+                              <td className="py-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    mockSupabase.deleteDiscountCoupon(coupon.id);
+                                    reloadData();
+                                    showToast("Bon de réduction supprimé.");
+                                  }}
+                                  className="px-2 py-1 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-[10px] font-bold cursor-pointer border-none"
+                                >
+                                  Supprimer
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {saasCoupons.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
+                                Aucun bon de réduction configuré.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 </div>
@@ -4633,9 +5234,9 @@ export default function DashboardPage() {
               {/* Pricing Cards Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 {[
-                  { plan: 'Standard', price: '15.000f', desc: 'Pour les petites structures', limit: 'Max 5 biens', popular: false },
-                  { plan: 'Premium', price: '25.000f', desc: 'Pour les agences en croissance', limit: 'Max 15 biens', popular: true },
-                  { plan: 'VIP', price: '50.000f', desc: 'Forfait sans concessions', limit: 'Biens illimités', popular: false },
+                  { plan: 'Standard', desc: 'Pour les petites structures', limit: 'Max 5 biens', popular: false },
+                  { plan: 'Premium', desc: 'Pour les agences en croissance', limit: 'Max 15 biens', popular: true },
+                  { plan: 'VIP', desc: 'Forfait sans concessions', limit: 'Biens illimités', popular: false },
                 ].map((item) => (
                   <div 
                     key={item.plan}
@@ -4653,7 +5254,7 @@ export default function DashboardPage() {
                     )}
                     <div>
                       <span className="text-xs font-bold text-slate-400 block font-mono">{item.plan}</span>
-                      <h4 className="text-xl font-black text-slate-900 mt-1">{item.price} <span className="text-xs font-normal text-slate-500 font-sans">/mois</span></h4>
+                      <h4 className="text-xl font-black text-slate-900 mt-1">{getDynamicPlanPrice(item.plan).toLocaleString()} FCFA <span className="text-xs font-normal text-slate-500 font-sans">/mois</span></h4>
                       <p className="text-[10px] text-slate-500 mt-2 leading-snug">{item.desc}</p>
                     </div>
                     <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-800">
@@ -4705,11 +5306,7 @@ export default function DashboardPage() {
                     <label className="text-[10px] text-slate-400 block mb-1 font-bold">Montant à facturer</label>
                     <div className="bg-slate-200/50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold font-mono text-slate-800 text-sm h-[38px] flex items-center justify-between">
                       <span>Forfait {selectedBillingPlan}</span>
-                      <span className="text-amber-600 font-black">{
-                        selectedBillingPlan === 'Standard' ? '15 000 FCFA' : 
-                        selectedBillingPlan === 'Premium' ? '25 000 FCFA' : 
-                        '50 000 FCFA'
-                      }</span>
+                      <span className="text-amber-600 font-black">{getDynamicPlanPrice(selectedBillingPlan).toLocaleString()} FCFA</span>
                     </div>
                   </div>
                 </div>
