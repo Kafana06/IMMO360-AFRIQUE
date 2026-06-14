@@ -121,6 +121,7 @@ export default function LandingPage() {
           </div>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
+            <Link href="/marketplace" className="text-amber-500 font-bold hover:text-amber-450 transition-colors">Marketplace 🌟</Link>
             <a href="#problems" className="hover:text-amber-500 transition-colors">Défis</a>
             <a href="#features" className="hover:text-amber-500 transition-colors">Fonctionnalités</a>
             <a href="#simulator" className="hover:text-amber-500 transition-colors">Démo live</a>

@@ -182,6 +182,20 @@ export interface SaleTransaction {
   created_at: string;
 }
 
+export interface Appointment {
+  id: string;
+  agency_id: string;
+  property_id: string;
+  client_name: string;
+  client_email: string;
+  client_phone: string;
+  date: string;
+  time: string;
+  status: 'En attente' | 'Confirmé' | 'Annulé';
+  created_at: string;
+  message?: string;
+}
+
 // Données en mémoire initialisées avec le compte d'administration par défaut (Kafana)
 let db_agencies: Agency[] = [
   {
@@ -221,6 +235,7 @@ let db_maintenance_tickets: MaintenanceTicket[] = [];
 let db_crm_leads: CRMLead[] = [];
 let db_social_housing: SocialHousingApplication[] = [];
 let db_sales: SaleTransaction[] = [];
+let db_appointments: Appointment[] = [];
 
 let saas_plans: SaaSPlanSettings = {
   standard_price: 15000,
@@ -252,6 +267,7 @@ export function saveToStorage() {
     localStorage.setItem('immo360_db_crm_leads', JSON.stringify(db_crm_leads));
     localStorage.setItem('immo360_db_social_housing', JSON.stringify(db_social_housing));
     localStorage.setItem('immo360_db_sales', JSON.stringify(db_sales));
+    localStorage.setItem('immo360_db_appointments', JSON.stringify(db_appointments));
     localStorage.setItem('immo360_saas_plans', JSON.stringify(saas_plans));
     localStorage.setItem('immo360_db_coupons', JSON.stringify(db_coupons));
   } catch (e) {
@@ -299,6 +315,9 @@ export function loadFromStorage(): boolean {
     
     const sales = localStorage.getItem('immo360_db_sales');
     if (sales) db_sales = JSON.parse(sales);
+
+    const appts = localStorage.getItem('immo360_db_appointments');
+    if (appts) db_appointments = JSON.parse(appts);
     
     const plansStr = localStorage.getItem('immo360_saas_plans');
     if (plansStr) saas_plans = JSON.parse(plansStr);
@@ -634,6 +653,10 @@ export const mockSupabase = {
     return db_properties.filter(p => p.agency_id === this.activeAgencyId);
   },
 
+  getAllProperties(): Property[] {
+    return db_properties;
+  },
+
   addProperty(property: Omit<Property, 'id' | 'agency_id'>) {
     const newProperty: Property = {
       ...property,
@@ -890,6 +913,31 @@ export const mockSupabase = {
       };
     });
     return stats;
+  },
+
+  getAppointments(): Appointment[] {
+    return db_appointments.filter(a => a.agency_id === this.activeAgencyId);
+  },
+
+  getAllAppointments(): Appointment[] {
+    return db_appointments;
+  },
+
+  addAppointment(appointment: Omit<Appointment, 'id' | 'status' | 'created_at'>) {
+    const newAppointment: Appointment = {
+      ...appointment,
+      id: `appt-${Math.random().toString(36).substr(2, 9)}`,
+      status: 'En attente',
+      created_at: new Date().toISOString()
+    };
+    db_appointments.unshift(newAppointment);
+    saveToStorage();
+    return newAppointment;
+  },
+
+  updateAppointmentStatus(appointmentId: string, status: Appointment['status']) {
+    db_appointments = db_appointments.map(a => a.id === appointmentId ? { ...a, status } : a);
+    saveToStorage();
   }
 };
 
@@ -897,5 +945,35 @@ const loaded = loadFromStorage();
 if (!loaded) {
   // Pré-remplissage des données de démo pour le compte d'agence par défaut Kafana
   mockSupabase.generateDemoDataForAgency('a-kafana', "Côte d'Ivoire");
+  saveToStorage();
+}
+
+if (!loaded || db_appointments.length === 0) {
+  db_appointments = [
+    {
+      id: 'appt-seed1',
+      agency_id: 'a-kafana',
+      property_id: db_properties[0]?.id || 'p-seed',
+      client_name: 'Ismaël Touré',
+      client_email: 'ismael.toure@gmail.com',
+      client_phone: '+225 07 45 67 89 01',
+      date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      time: '10:30',
+      status: 'En attente',
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 'appt-seed2',
+      agency_id: 'a-kafana',
+      property_id: db_properties[0]?.id || 'p-seed',
+      client_name: 'Fatou Diop',
+      client_email: 'fatou.diop@yahoo.fr',
+      client_phone: '+225 05 11 22 33 44',
+      date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      time: '15:00',
+      status: 'Confirmé',
+      created_at: new Date().toISOString()
+    }
+  ];
   saveToStorage();
 }

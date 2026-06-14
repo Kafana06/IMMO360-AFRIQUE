@@ -32,13 +32,14 @@ import {
   Lock,
   Mail,
   Eye,
-  EyeOff
+  EyeOff,
+  Calendar
 } from 'lucide-react';
 import { mockSupabase, Agency, Property, Landlord, Tenant, Lease, Payment, Receipt, MaintenanceTicket, CRMLead, SocialHousingApplication, SaleTransaction, Profile } from '@/lib/supabase/mock';
 import Link from 'next/link';
 
 export default function DashboardPage() {
-  const [activeMenu, setActiveMenu] = useState<'overview' | 'properties' | 'sales' | 'landlords' | 'tenants' | 'leases' | 'payments' | 'receipts' | 'maintenance' | 'crm' | 'social' | 'settings' | 'saas' | 'contact'>('overview');
+  const [activeMenu, setActiveMenu] = useState<'overview' | 'properties' | 'sales' | 'landlords' | 'tenants' | 'leases' | 'payments' | 'receipts' | 'maintenance' | 'crm' | 'social' | 'appointments' | 'settings' | 'saas' | 'contact'>('overview');
   
   // State réactif de la simulation de base de données
   const [currentAgency, setCurrentAgency] = useState(mockSupabase.getAgency());
@@ -53,6 +54,7 @@ export default function DashboardPage() {
   const [crmLeads, setCrmLeads] = useState<CRMLead[]>([]);
   const [socialApps, setSocialApps] = useState<(SocialHousingApplication & { property?: Property })[]>([]);
   const [sales, setSales] = useState<(SaleTransaction & { property: Property })[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
 
   // Filtres actifs pour le catalogue des biens
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('Tous');
@@ -781,6 +783,7 @@ export default function DashboardPage() {
     setCrmLeads(mockSupabase.getCRMLeads());
     setSocialApps(mockSupabase.getSocialHousingApplications());
     setSales(mockSupabase.getSaleTransactions());
+    setAppointments(mockSupabase.getAppointments());
     setSaasPlansSettings(mockSupabase.getSaaSPlanSettings());
     setSaasCoupons(mockSupabase.getDiscountCoupons());
     setGlobalAgenciesStats(mockSupabase.getGlobalAgenciesStats());
@@ -1027,6 +1030,18 @@ export default function DashboardPage() {
       reloadData();
       showToast(`Abonnement de ${target.name} changé vers ${plan}.`);
     }
+  };
+
+  const handleConfirmAppointment = (apptId: string) => {
+    mockSupabase.updateAppointmentStatus(apptId, 'Confirmé');
+    reloadData();
+    showToast("Le rendez-vous a été confirmé avec succès.");
+  };
+
+  const handleCancelAppointment = (apptId: string) => {
+    mockSupabase.updateAppointmentStatus(apptId, 'Annulé');
+    reloadData();
+    showToast("Le rendez-vous a été annulé.");
   };
 
   const handleSimulateWhatsAppRelance = (payment: Payment & { lease: Lease & { property: Property; tenant: Tenant } }) => {
@@ -2084,7 +2099,8 @@ export default function DashboardPage() {
                   { id: 'payments', label: 'Loyers & Encaissements', icon: CreditCard },
                   { id: 'receipts', label: 'Quittances de loyer', icon: FileText },
                   { id: 'maintenance', label: 'Tickets de Maintenance', icon: Wrench },
-                  { id: 'crm', label: 'CRM Prospects', icon: Users }
+                  { id: 'crm', label: 'CRM Prospects', icon: Users },
+                  { id: 'appointments', label: 'Rendez-vous (Visites)', icon: Calendar }
                 ].map(item => (
                   <button
                     key={item.id}
@@ -2259,7 +2275,8 @@ export default function DashboardPage() {
                       { id: 'payments', label: 'Loyers & Encaissements', icon: CreditCard },
                       { id: 'receipts', label: 'Quittances de loyer', icon: FileText },
                       { id: 'maintenance', label: 'Tickets de Maintenance', icon: Wrench },
-                      { id: 'crm', label: 'CRM Prospects', icon: Users }
+                      { id: 'crm', label: 'CRM Prospects', icon: Users },
+                      { id: 'appointments', label: 'Rendez-vous (Visites)', icon: Calendar }
                     ].map(item => (
                       <button
                         key={item.id}
@@ -3617,6 +3634,147 @@ export default function DashboardPage() {
                             </td>
                           </tr>
                         ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* RENDEZ-VOUS (APPOINTMENTS) VIEW */}
+          {activeMenu === 'appointments' && (
+            <div className="space-y-6 text-left">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h1 className="font-title text-xl font-bold text-slate-900">Gestion des Rendez-vous</h1>
+                  <p className="text-xs text-slate-400 mt-1">Consultez les demandes de visite de biens planifiées par le public sur la marketplace.</p>
+                </div>
+              </div>
+
+              {/* Stat Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                    <Calendar className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div>
+                    <span className="block text-2xl font-bold font-mono text-slate-900">{appointments.length}</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Total RDV</span>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <Clock className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="block text-2xl font-bold font-mono text-slate-900">
+                      {appointments.filter(a => a.status === 'En attente').length}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">En attente</span>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="block text-2xl font-bold font-mono text-slate-900">
+                      {appointments.filter(a => a.status === 'Confirmé').length}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Confirmés</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Table of bookings */}
+              <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                  <span className="font-bold text-slate-900 text-sm">Liste des réservations de visite</span>
+                </div>
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-400 font-bold text-xs">
+                        <th className="pb-3 px-6 font-semibold">Client</th>
+                        <th className="pb-3 font-semibold">Bien ciblé</th>
+                        <th className="pb-3 font-semibold">Date & Heure</th>
+                        <th className="pb-3 font-semibold">Statut</th>
+                        <th className="pb-3 px-6 font-semibold text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {appointments.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-10 text-center text-xs text-slate-400">
+                            Aucune réservation enregistrée pour cette agence.
+                          </td>
+                        </tr>
+                      ) : (
+                        appointments.map(appt => {
+                          const targetProp = mockSupabase.getAllProperties().find(p => p.id === appt.property_id);
+                          
+                          return (
+                            <tr key={appt.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="py-4 px-6">
+                                <div>
+                                  <span className="font-bold text-slate-900 block text-xs">{appt.client_name}</span>
+                                  <span className="text-[10px] text-slate-400 block font-mono">{appt.client_phone}</span>
+                                  <span className="text-[10px] text-slate-400 block font-mono">{appt.client_email}</span>
+                                </div>
+                              </td>
+                              <td className="py-4 text-xs font-semibold text-slate-700">
+                                {targetProp ? targetProp.name : 'Bien inconnu'}
+                                <span className="block text-[10px] text-slate-400 font-normal">{targetProp?.city}, {targetProp?.country}</span>
+                              </td>
+                              <td className="py-4 font-mono text-xs text-slate-600">
+                                <div>
+                                  <span className="font-semibold text-slate-800">{appt.date}</span>
+                                  <span className="block text-[10px] text-slate-400">Créneau : {appt.time}</span>
+                                </div>
+                              </td>
+                              <td className="py-4">
+                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                  appt.status === 'Confirmé' ? 'bg-emerald-100 text-emerald-700' :
+                                  appt.status === 'Annulé' ? 'bg-rose-100 text-rose-700' :
+                                  'bg-amber-100 text-amber-700'
+                                }`}>
+                                  {appt.status}
+                                </span>
+                              </td>
+                              <td className="py-4 px-6 text-right space-x-1">
+                                {appt.status === 'En attente' && (
+                                  <button
+                                    onClick={() => handleConfirmAppointment(appt.id)}
+                                    className="px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] cursor-pointer border-none transition-all"
+                                  >
+                                    Confirmer
+                                  </button>
+                                )}
+                                {appt.status !== 'Annulé' && (
+                                  <button
+                                    onClick={() => handleCancelAppointment(appt.id)}
+                                    className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 font-bold text-[10px] cursor-pointer transition-all"
+                                  >
+                                    Annuler
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    showToast(`Rappel WhatsApp de visite envoyé à ${appt.client_name} (${appt.client_phone}) pour le ${appt.date} à ${appt.time}.`);
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[10px] cursor-pointer border-none transition-all"
+                                  title="Simuler rappel WhatsApp"
+                                >
+                                  Rappel
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
