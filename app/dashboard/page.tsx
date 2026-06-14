@@ -30,7 +30,9 @@ import {
   MapPin,
   Sparkles,
   Lock,
-  Mail
+  Mail,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { mockSupabase, Agency, Property, Landlord, Tenant, Lease, Payment, Receipt, MaintenanceTicket, CRMLead, SocialHousingApplication, SaleTransaction, Profile } from '@/lib/supabase/mock';
 import Link from 'next/link';
@@ -205,7 +207,7 @@ export default function DashboardPage() {
     }
     return false;
   });
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>(() => {
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot_password'>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('signup') === 'true') return 'signup';
@@ -218,6 +220,7 @@ export default function DashboardPage() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // States pour la création de compte agence (Sign Up)
   const [signupAgencyName, setSignupAgencyName] = useState('');
@@ -227,6 +230,9 @@ export default function DashboardPage() {
   const [signupPhone, setSignupPhone] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
+  const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
   const [signupFirstName, setSignupFirstName] = useState('');
   const [signupLastName, setSignupLastName] = useState('');
   const [signupUserPhone, setSignupUserPhone] = useState('');
@@ -240,6 +246,19 @@ export default function DashboardPage() {
   const [generatedCode, setGeneratedCode] = useState('');
   const [userEnteredCode, setUserEnteredCode] = useState('');
   const [verificationError, setVerificationError] = useState<string | null>(null);
+
+  // States pour le flux "Mot de passe oublié"
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotPhone, setForgotPhone] = useState('');
+  const [forgotStep, setForgotStep] = useState<1 | 2 | 3>(1);
+  const [forgotGeneratedCode, setForgotGeneratedCode] = useState('');
+  const [forgotEnteredCode, setForgotEnteredCode] = useState('');
+  const [forgotPassword, setForgotPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
 
   // États de paiement/checkout
   const [promoCode, setPromoCode] = useState('');
@@ -304,10 +323,16 @@ export default function DashboardPage() {
       const emailLower = loginEmail.trim().toLowerCase();
       const pass = loginPassword.trim();
 
+      const profile = mockSupabase.getProfiles().find(p => 
+        p.email.toLowerCase() === emailLower || 
+        (emailLower === 'kafana' && p.email.toLowerCase() === 'kafanafousseni@gmail.com')
+      );
+
       const agenciesList = mockSupabase.getAgencies();
       const matchedAgency = agenciesList.find(a => 
         a.email.toLowerCase() === emailLower || 
-        (emailLower === 'kafana' && a.email.toLowerCase() === 'kafanafousseni@gmail.com')
+        (emailLower === 'kafana' && a.email.toLowerCase() === 'kafanafousseni@gmail.com') ||
+        (profile && a.id === profile.agency_id)
       );
 
       if (!matchedAgency) {
@@ -316,7 +341,18 @@ export default function DashboardPage() {
         return;
       }
 
-      if (pass !== 'password' && pass !== 'admin' && pass !== '123456' && pass !== 'Kafana0605@') {
+      if (matchedAgency.status === 'Suspendu') {
+        setLoginError("Cette agence a été suspendue/bloquée par l'administrateur SaaS. Veuillez contacter le support.");
+        setLoginLoading(false);
+        return;
+      }
+
+      // Check password
+      const isPasswordValid = profile?.password 
+        ? pass === profile.password 
+        : (pass === 'password' || pass === 'admin' || pass === '123456' || pass === 'Kafana0605@');
+
+      if (!isPasswordValid) {
         setLoginError("Mot de passe incorrect.");
         setLoginLoading(false);
         return;
@@ -375,12 +411,40 @@ export default function DashboardPage() {
     }
   };
 
+  const sendEmailNotification = async (to: string, subject: string, html: string) => {
+    try {
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ to, subject, html }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        return true;
+      } else {
+        console.warn(`Email sending failed: ${data.error}`);
+        return false;
+      }
+    } catch (error) {
+      console.error('Failed to send email:', error);
+      return false;
+    }
+  };
+
   const handleSignup = (e: React.FormEvent) => {
     e.preventDefault();
     setSignupLoading(true);
     setSignupError(null);
 
-    setTimeout(() => {
+    if (signupPassword !== signupConfirmPassword) {
+      setSignupError("Les mots de passe ne correspondent pas.");
+      setSignupLoading(false);
+      return;
+    }
+
+    setTimeout(async () => {
       const emailLower = signupEmail.trim().toLowerCase();
 
       const existing = mockSupabase.getAgencies().some(a => a.email.toLowerCase() === emailLower);
@@ -390,13 +454,43 @@ export default function DashboardPage() {
         return;
       }
 
-      // Générer le code de validation à 4 chiffres
-      const code = Math.floor(1000 + Math.random() * 9000).toString();
+      // Générer le code de validation à 6 chiffres
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedCode(code);
-      setSignupStep('verification');
-      setSignupLoading(false);
 
-      showToast(`[E-mail de validation] Code envoyé à ${signupEmail} : ${code}`);
+      const emailHtml = `
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; color: #1e293b; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="display: inline-block; width: 50px; height: 50px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; line-height: 50px; text-align: center; color: white; font-size: 24px; font-weight: bold;">I</div>
+            <h1 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 15px; margin-bottom: 5px; letter-spacing: -0.025em;">IMMO360 AFRIQUE</h1>
+            <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; margin: 0;">SaaS de Gestion Immobilière Premium</p>
+          </div>
+          <div style="line-height: 1.6; font-size: 15px;">
+            <p style="margin-top: 0;">Bonjour ${signupFirstName} ${signupLastName},</p>
+            <p>Merci d'avoir choisi <strong>IMMO360 AFRIQUE</strong> pour la gestion de votre agence immobilière <strong>"${signupAgencyName}"</strong>.</p>
+            <p>Pour finaliser la création de votre compte, veuillez utiliser le code de validation à 6 chiffres ci-dessous :</p>
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0;">
+              <span style="font-size: 36px; font-weight: 800; font-family: monospace; letter-spacing: 8px; color: #d97706; padding-left: 8px;">${code}</span>
+            </div>
+            <p style="font-size: 13px; color: #64748b;">Ce code est valide pendant 15 minutes. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mail.</p>
+          </div>
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;" />
+          <div style="text-align: center; font-size: 12px; color: #94a3b8;">
+            <p style="margin: 0 0 4px 0;">© 2026 IMMO360 AFRIQUE. Tous droits réservés.</p>
+            <p style="margin: 0;">Côte d'Ivoire & Sénégal • Espace de Gestion Multi-tenant</p>
+          </div>
+        </div>
+      `;
+
+      const sent = await sendEmailNotification(emailLower, "Code de validation - IMMO360 AFRIQUE", emailHtml);
+      setSignupLoading(false);
+      setSignupStep('verification');
+
+      if (sent) {
+        showToast(`[E-mail de validation] Code envoyé à ${signupEmail}`);
+      } else {
+        showToast(`[Démo] Impossible d'envoyer le mail. Code : ${code}`);
+      }
     }, 1000);
   };
 
@@ -410,6 +504,106 @@ export default function DashboardPage() {
     } else {
       setVerificationError("Code de validation incorrect. Veuillez réessayer.");
     }
+  };
+
+  const handleForgotRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    setForgotError(null);
+
+    const emailClean = forgotEmail.trim().toLowerCase();
+    const phoneClean = forgotPhone.trim().replace(/\s+/g, '');
+
+    const profile = mockSupabase.getProfiles().find(
+      p => p.email.toLowerCase() === emailClean &&
+           p.phone.trim().replace(/\s+/g, '') === phoneClean
+    );
+
+    if (!profile) {
+      setForgotError("Aucun profil correspondant à cet email et numéro de téléphone enregistré n'a été trouvé. Par sécurité, la récupération est impossible.");
+      setForgotLoading(false);
+      return;
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setForgotGeneratedCode(code);
+
+    const emailHtml = `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; color: #1e293b; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <div style="display: inline-block; width: 50px; height: 50px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; line-height: 50px; text-align: center; color: white; font-size: 24px; font-weight: bold;">I</div>
+          <h1 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 15px; margin-bottom: 5px; letter-spacing: -0.025em;">IMMO360 AFRIQUE</h1>
+          <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; margin: 0;">SaaS de Gestion Immobilière Premium</p>
+        </div>
+        <div style="line-height: 1.6; font-size: 15px;">
+          <p style="margin-top: 0;">Bonjour ${profile.first_name} ${profile.last_name},</p>
+          <p>Vous avez demandé la réinitialisation de votre mot de passe pour votre compte IMMO360 AFRIQUE.</p>
+          <p>Veuillez utiliser le code de sécurité à 6 chiffres ci-dessous pour poursuivre l'opération :</p>
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0;">
+            <span style="font-size: 36px; font-weight: 800; font-family: monospace; letter-spacing: 8px; color: #d97706; padding-left: 8px;">${code}</span>
+          </div>
+          <p style="font-size: 13px; color: #64748b;">Ce code de sécurité à usage unique expire dans 15 minutes. Si vous n'avez pas demandé ce changement, vous pouvez ignorer cet e-mail et votre mot de passe restera inchangé.</p>
+        </div>
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;" />
+        <div style="text-align: center; font-size: 12px; color: #94a3b8;">
+          <p style="margin: 0 0 4px 0;">© 2026 IMMO360 AFRIQUE. Tous droits réservés.</p>
+          <p style="margin: 0;">Côte d'Ivoire & Sénégal • Espace de Gestion Multi-tenant</p>
+        </div>
+      </div>
+    `;
+
+    const sent = await sendEmailNotification(emailClean, "Récupération de mot de passe - IMMO360 AFRIQUE", emailHtml);
+    setForgotLoading(false);
+    if (sent) {
+      showToast(`[Code envoyé] Un code de récupération a été envoyé à ${forgotEmail}`);
+    } else {
+      showToast(`[Démo] Impossible d'envoyer le mail. Code : ${code}`);
+    }
+    setForgotStep(2);
+  };
+
+  const handleForgotVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError(null);
+
+    if (forgotEnteredCode.trim() === forgotGeneratedCode) {
+      setForgotStep(3);
+    } else {
+      setForgotError("Code de validation incorrect. Veuillez réessayer.");
+    }
+  };
+
+  const handleForgotReset = (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    setForgotError(null);
+
+    if (forgotPassword.length < 6) {
+      setForgotError("Le mot de passe doit contenir au moins 6 caractères.");
+      setForgotLoading(false);
+      return;
+    }
+
+    if (forgotPassword !== forgotConfirmPassword) {
+      setForgotError("Les mots de passe ne correspondent pas.");
+      setForgotLoading(false);
+      return;
+    }
+
+    mockSupabase.updateProfilePassword(forgotEmail.trim().toLowerCase(), forgotPassword);
+    
+    setForgotLoading(false);
+    showToast("Votre mot de passe a été réinitialisé avec succès.");
+    setAuthMode('login');
+    
+    // Clear forgot states
+    setForgotEmail('');
+    setForgotPhone('');
+    setForgotStep(1);
+    setForgotGeneratedCode('');
+    setForgotEnteredCode('');
+    setForgotPassword('');
+    setForgotConfirmPassword('');
   };
 
   const handleCheckoutSubmit = (e: React.FormEvent) => {
@@ -435,7 +629,8 @@ export default function DashboardPage() {
         email: emailLower,
         first_name: signupFirstName,
         last_name: signupLastName,
-        phone: signupUserPhone
+        phone: signupUserPhone,
+        password: signupPassword
       };
 
       // Register
@@ -815,6 +1010,16 @@ export default function DashboardPage() {
     showToast(`Statut de l'agence mis à jour : ${nextStatus}`);
   };
 
+  const handleDeleteAgency = (agencyId: string) => {
+    const target = mockSupabase.getAgencies().find(a => a.id === agencyId);
+    if (!target) return;
+    if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement l'agence "${target.name}" ?\n\nCette action est irréversible et supprimera toutes ses données ainsi que les profils d'accès.`)) {
+      mockSupabase.deleteAgency(agencyId);
+      reloadData();
+      showToast(`L'agence "${target.name}" a été définitivement supprimée.`);
+    }
+  };
+
   const updateAgencyPlan = (agencyId: string, plan: Agency['plan']) => {
     const target = mockSupabase.getAgencies().find(a => a.id === agencyId);
     if (target) {
@@ -896,6 +1101,23 @@ export default function DashboardPage() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center relative overflow-hidden font-sans select-none selection:bg-amber-500 selection:text-slate-900">
+        {/* TOAST SYSTEM FOR AUTH VIEWS */}
+        <AnimatePresence>
+          {toastMessage && (
+            <motion.div 
+              initial={{ opacity: 0, y: -50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-4 rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-2xl flex items-center gap-3 max-w-lg text-sm"
+            >
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+              </div>
+              <span className="font-semibold text-slate-100">{toastMessage}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Background decorative gradients */}
         <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-500/15 rounded-full blur-[140px] pointer-events-none" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-slate-800/30 rounded-full blur-[160px] pointer-events-none" />
@@ -922,7 +1144,7 @@ export default function DashboardPage() {
           </div>
 
           <AnimatePresence mode="wait">
-            {authMode === 'login' ? (
+            {authMode === 'login' && (
               <motion.div 
                 key="login"
                 initial={{ opacity: 0, x: -20 }}
@@ -952,6 +1174,7 @@ export default function DashboardPage() {
                       <input
                         type="email"
                         required
+                        autoComplete="off"
                         value={loginEmail}
                         onChange={(e) => setLoginEmail(e.target.value)}
                         placeholder="admin@monagence.com"
@@ -965,13 +1188,21 @@ export default function DashboardPage() {
                     <div className="relative">
                       <Lock className="absolute left-4 top-3.5 w-4 h-4 text-slate-500" />
                       <input
-                        type="password"
+                        type={showLoginPassword ? "text" : "password"}
                         required
+                        autoComplete="new-password"
                         value={loginPassword}
                         onChange={(e) => setLoginPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-11 pr-4 py-2.5 text-xs text-white focus:outline-none transition-all font-mono"
+                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-11 pr-10 py-2.5 text-xs text-white focus:outline-none transition-all font-mono"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                        className="absolute right-3 top-3 text-slate-500 hover:text-slate-350 cursor-pointer border-none bg-transparent"
+                      >
+                        {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
 
@@ -990,16 +1221,30 @@ export default function DashboardPage() {
                   </div>
                 </form>
 
-                <div className="text-center mt-6">
+                <div className="flex items-center justify-between mt-6">
                   <button 
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('forgot_password');
+                      setForgotStep(1);
+                      setForgotError(null);
+                    }}
+                    className="text-xs text-amber-500 hover:text-amber-400 transition-colors underline underline-offset-4 cursor-pointer"
+                  >
+                    Mot de passe oublié ?
+                  </button>
+                  <button 
+                    type="button"
                     onClick={() => setAuthMode('signup')}
-                    className="text-xs text-slate-450 hover:text-slate-350 transition-colors underline underline-offset-4 cursor-pointer"
+                    className="text-xs text-slate-400 hover:text-slate-350 transition-colors underline underline-offset-4 cursor-pointer"
                   >
                     Créer un compte d'agence
                   </button>
                 </div>
               </motion.div>
-            ) : (
+            )}
+
+            {authMode === 'signup' && (
               <motion.div 
                 key="signup"
                 initial={{ opacity: 0, x: 20 }}
@@ -1124,6 +1369,7 @@ export default function DashboardPage() {
                           <input
                             type="email"
                             required
+                            autoComplete="off"
                             value={signupEmail}
                             onChange={(e) => setSignupEmail(e.target.value)}
                             placeholder="admin@monagence.com"
@@ -1132,14 +1378,46 @@ export default function DashboardPage() {
                         </div>
                         <div>
                           <label className="text-[10px] text-slate-400 block mb-1.5 font-medium">Mot de passe *</label>
+                          <div className="relative">
+                            <input
+                              type={showSignupPassword ? "text" : "password"}
+                              required
+                              autoComplete="new-password"
+                              value={signupPassword}
+                              onChange={(e) => setSignupPassword(e.target.value)}
+                              placeholder="••••••••"
+                              className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-4 pr-10 py-2 text-xs text-white focus:outline-none transition-all font-mono"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowSignupPassword(!showSignupPassword)}
+                              className="absolute right-3 top-2 text-slate-500 hover:text-slate-350 cursor-pointer border-none bg-transparent"
+                            >
+                              {showSignupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1.5 font-medium">Confirmer le mot de passe *</label>
+                        <div className="relative">
                           <input
-                            type="password"
+                            type={showSignupConfirmPassword ? "text" : "password"}
                             required
-                            value={signupPassword}
-                            onChange={(e) => setSignupPassword(e.target.value)}
+                            autoComplete="new-password"
+                            value={signupConfirmPassword}
+                            onChange={(e) => setSignupConfirmPassword(e.target.value)}
                             placeholder="••••••••"
-                            className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all font-mono"
+                            className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-4 pr-10 py-2 text-xs text-white focus:outline-none transition-all font-mono"
                           />
+                          <button
+                            type="button"
+                            onClick={() => setShowSignupConfirmPassword(!showSignupConfirmPassword)}
+                            className="absolute right-3 top-2 text-slate-500 hover:text-slate-350 cursor-pointer border-none bg-transparent"
+                          >
+                            {showSignupConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
                         </div>
                       </div>
 
@@ -1170,7 +1448,7 @@ export default function DashboardPage() {
                 ) : signupStep === 'verification' ? (
                   <div>
                     <h2 className="text-lg font-bold text-white mb-2">Validation de l'e-mail</h2>
-                    <p className="text-xs text-slate-400 mb-6">Un e-mail de validation contenant un code à 4 chiffres a été envoyé à <span className="text-white font-semibold font-mono">{signupEmail}</span>.</p>
+                    <p className="text-xs text-slate-400 mb-6">Un e-mail de validation contenant un code à 6 chiffres a été envoyé à <span className="text-white font-semibold font-mono">{signupEmail}</span>.</p>
 
                     <form onSubmit={handleVerifyCodeSubmit} className="space-y-6 text-left">
                       {verificationError && (
@@ -1181,14 +1459,14 @@ export default function DashboardPage() {
                       )}
 
                       <div>
-                        <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Code de Validation (4 chiffres)</label>
+                        <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Code de Validation (6 chiffres)</label>
                         <input
                           type="text"
                           required
-                          maxLength={4}
+                          maxLength={6}
                           value={userEnteredCode}
                           onChange={(e) => setUserEnteredCode(e.target.value)}
-                          placeholder="Ex: 1234"
+                          placeholder="Ex: 123456"
                           className="w-full text-center bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-3 text-lg font-bold text-white focus:outline-none transition-all tracking-widest font-mono"
                         />
                       </div>
@@ -1400,6 +1678,187 @@ export default function DashboardPage() {
                     </form>
                   </div>
                 )}
+              </motion.div>
+            )}
+
+            {authMode === 'forgot_password' && (
+              <motion.div 
+                key="forgot"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden"
+              >
+                <h2 className="text-lg font-bold text-white mb-2">Récupération de mot de passe</h2>
+                <p className="text-xs text-slate-400 mb-6 font-medium">
+                  {forgotStep === 1 && "Entrez vos identifiants pour recevoir un code de sécurité par e-mail."}
+                  {forgotStep === 2 && "Saisissez le code de validation à 6 chiffres envoyé à votre adresse e-mail."}
+                  {forgotStep === 3 && "Définissez un nouveau mot de passe sécurisé pour votre compte."}
+                </p>
+
+                {forgotError && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2 mb-4"
+                  >
+                    <XCircle className="w-4 h-4 shrink-0" />
+                    <span>{forgotError}</span>
+                  </motion.div>
+                )}
+
+                {forgotStep === 1 && (
+                  <form onSubmit={handleForgotRequest} className="space-y-4 text-left">
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Adresse Email Administrateur</label>
+                      <div className="relative">
+                        <Mail className="absolute left-4 top-3.5 w-4 h-4 text-slate-500" />
+                        <input
+                          type="email"
+                          required
+                          autoComplete="off"
+                          value={forgotEmail}
+                          onChange={(e) => setForgotEmail(e.target.value)}
+                          placeholder="admin@monagence.com"
+                          className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-11 pr-4 py-2.5 text-xs text-white focus:outline-none transition-all font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Téléphone Administrateur Enregistré (Sécurité)</label>
+                      <div className="relative">
+                        <Smartphone className="absolute left-4 top-3.5 w-4 h-4 text-slate-500" />
+                        <input
+                          type="text"
+                          required
+                          value={forgotPhone}
+                          onChange={(e) => setForgotPhone(e.target.value)}
+                          placeholder="Ex: +225 07..."
+                          className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-11 pr-4 py-2.5 text-xs text-white focus:outline-none transition-all font-mono"
+                        />
+                      </div>
+                      <p className="text-[9px] text-slate-500 mt-1 font-medium">Par mesure de sécurité, nous vérifions que le numéro de téléphone correspond à celui renseigné lors de la création de l'agence.</p>
+                    </div>
+
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        disabled={forgotLoading}
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:from-slate-800 disabled:to-slate-800 text-slate-950 disabled:text-slate-500 font-bold text-xs shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer border-none"
+                      >
+                        {forgotLoading ? (
+                          <div className="w-4 h-4 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
+                        ) : (
+                          <span>Envoyer le code</span>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {forgotStep === 2 && (
+                  <form onSubmit={handleForgotVerify} className="space-y-4 text-left">
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Code de Validation à 6 chiffres</label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={6}
+                        value={forgotEnteredCode}
+                        onChange={(e) => setForgotEnteredCode(e.target.value)}
+                        placeholder="Ex: 123456"
+                        className="w-full text-center bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2.5 text-lg font-bold tracking-widest text-white focus:outline-none transition-all font-mono"
+                      />
+                    </div>
+
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer border-none"
+                      >
+                        <span>Vérifier le code</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {forgotStep === 3 && (
+                  <form onSubmit={handleForgotReset} className="space-y-4 text-left">
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Nouveau Mot de passe</label>
+                      <div className="relative">
+                        <Lock className="absolute left-4 top-3.5 w-4 h-4 text-slate-500" />
+                        <input
+                          type={showForgotPassword ? "text" : "password"}
+                          required
+                          autoComplete="new-password"
+                          value={forgotPassword}
+                          onChange={(e) => setForgotPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-11 pr-10 py-2.5 text-xs text-white focus:outline-none transition-all font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowForgotPassword(!showForgotPassword)}
+                          className="absolute right-3 top-3 text-slate-500 hover:text-slate-350 cursor-pointer border-none bg-transparent"
+                        >
+                          {showForgotPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Confirmer le Nouveau Mot de passe</label>
+                      <div className="relative">
+                        <Lock className="absolute left-4 top-3.5 w-4 h-4 text-slate-500" />
+                        <input
+                          type={showForgotConfirmPassword ? "text" : "password"}
+                          required
+                          autoComplete="new-password"
+                          value={forgotConfirmPassword}
+                          onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-11 pr-10 py-2.5 text-xs text-white focus:outline-none transition-all font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowForgotConfirmPassword(!showForgotConfirmPassword)}
+                          className="absolute right-3 top-3 text-slate-500 hover:text-slate-350 cursor-pointer border-none bg-transparent"
+                        >
+                          {showForgotConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        disabled={forgotLoading}
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:from-slate-800 disabled:to-slate-800 text-slate-950 disabled:text-slate-500 font-bold text-xs shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer border-none"
+                      >
+                        {forgotLoading ? (
+                          <div className="w-4 h-4 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
+                        ) : (
+                          <span>Enregistrer le mot de passe</span>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <div className="text-center mt-6">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('login');
+                      setForgotError(null);
+                    }}
+                    className="text-xs text-slate-450 hover:text-slate-350 transition-colors underline underline-offset-4 cursor-pointer"
+                  >
+                    Retour à la connexion
+                  </button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -3659,9 +4118,15 @@ export default function DashboardPage() {
                                     </button>
                                     <button
                                       onClick={() => changeAgency(agency.id)}
-                                      className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] cursor-pointer"
+                                      className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] cursor-pointer mr-1.5"
                                     >
                                       Incarner
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteAgency(agency.id)}
+                                      className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 font-bold text-[10px] cursor-pointer transition-all"
+                                    >
+                                      Supprimer
                                     </button>
                                   </td>
                                 </tr>

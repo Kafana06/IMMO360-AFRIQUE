@@ -38,6 +38,7 @@ export interface Profile {
   last_name: string;
   phone: string;
   role: 'super_admin' | 'agency_admin' | 'property_manager' | 'accountant' | 'agent' | 'landlord' | 'tenant';
+  password?: string;
 }
 
 export interface Landlord {
@@ -206,7 +207,8 @@ let db_profiles: Profile[] = [
     first_name: 'Fousseni',
     last_name: 'Kafana',
     phone: '+225 07 89 01 23 45',
-    role: 'agency_admin'
+    role: 'agency_admin',
+    password: 'Kafana0605@'
   }
 ];
 let db_landlords: Landlord[] = [];
@@ -388,6 +390,15 @@ export const mockSupabase = {
 
   deleteDiscountCoupon(couponId: string) {
     db_coupons = db_coupons.filter(c => c.id !== couponId);
+    saveToStorage();
+  },
+
+  updateProfilePassword(email: string, password: string) {
+    db_profiles = db_profiles.map(p => 
+      p.email.toLowerCase() === email.toLowerCase() 
+        ? { ...p, password } 
+        : p
+    );
     saveToStorage();
   },
 
@@ -610,6 +621,13 @@ export const mockSupabase = {
     db_agencies = db_agencies.map(a => a.id === agencyId ? { ...a, status } : a);
     saveToStorage();
   },
+
+  deleteAgency(agencyId: string) {
+    db_agencies = db_agencies.filter(a => a.id !== agencyId);
+    db_profiles = db_profiles.filter(p => p.agency_id !== agencyId);
+    saveToStorage();
+  },
+
 
   // PROPERTIES
   getProperties(): Property[] {
