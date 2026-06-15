@@ -80,7 +80,8 @@ export default function DashboardPage() {
   const [billingIsLoading, setBillingIsLoading] = useState(false);
 
   // States pour les onglets de la console SaaS
-  const [saasTab, setSaasTab] = useState<'overview' | 'agencies' | 'plans' | 'commissions' | 'broadcast' | 'infrastructure'>('overview');
+  const [saasTab, setSaasTab] = useState<'overview' | 'agencies' | 'plans' | 'commissions' | 'broadcast' | 'contacts' | 'infrastructure'>('overview');
+  const [groupEmailLoading, setGroupEmailLoading] = useState(false);
 
   // States pour les annonces globales (broadcast)
   const [broadcastMessage, setBroadcastMessage] = useState<string>('Maintenance planifiée ce soir de 23h à 01h GMT pour optimisation des bases de données locales.');
@@ -440,6 +441,12 @@ export default function DashboardPage() {
     setSignupLoading(true);
     setSignupError(null);
 
+    if (!signupPhone.trim()) {
+      setSignupError("Le numéro de téléphone de l'agence est obligatoire.");
+      setSignupLoading(false);
+      return;
+    }
+
     if (signupPassword !== signupConfirmPassword) {
       setSignupError("Les mots de passe ne correspondent pas.");
       setSignupLoading(false);
@@ -516,10 +523,16 @@ export default function DashboardPage() {
     const emailClean = forgotEmail.trim().toLowerCase();
     const phoneClean = forgotPhone.trim().replace(/\s+/g, '');
 
-    const profile = mockSupabase.getProfiles().find(
-      p => p.email.toLowerCase() === emailClean &&
-           p.phone.trim().replace(/\s+/g, '') === phoneClean
-    );
+    const profile = mockSupabase.getProfiles().find(p => {
+      const emailMatch = p.email.toLowerCase() === emailClean;
+      const cleanDigits = (num: string) => num.replace(/\D/g, '');
+      const pDigits = cleanDigits(p.phone);
+      const inputDigits = cleanDigits(forgotPhone);
+      const phoneMatch = pDigits === inputDigits || 
+                         (pDigits.length >= 8 && inputDigits.length >= 8 && 
+                          (pDigits.endsWith(inputDigits) || inputDigits.endsWith(pDigits)));
+      return emailMatch && phoneMatch;
+    });
 
     if (!profile) {
       setForgotError("Aucun profil correspondant à cet email et numéro de téléphone enregistré n'a été trouvé. Par sécurité, la récupération est impossible.");
@@ -972,24 +985,74 @@ export default function DashboardPage() {
     showToast("Nouveau prospect qualifié enregistré dans le pipeline.");
   };
 
-  const handleAddAgencySubmit = (e: React.FormEvent) => {
+  const handleAddAgencySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAgency.name || !newAgency.email) {
-      showToast("Veuillez remplir le nom et l'email de l'agence.");
+    if (!newAgency.name || !newAgency.email || !newAgency.phone) {
+      showToast("Veuillez remplir le nom, l'email et le téléphone de l'agence.");
       return;
     }
     
-    const added = mockSupabase.addAgency({
-      name: newAgency.name,
-      logo_url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=200&q=80',
-      country: newAgency.country,
-      currency: newAgency.currency,
-      address: newAgency.address || 'Abidjan / Dakar',
-      phone: newAgency.phone || '+225 00 00 00 00',
-      email: newAgency.email,
-      plan: newAgency.plan,
-      status: newAgency.status
-    });
+    const defaultPassword = 'Kafana0605@'; // Mot de passe par défaut
+    
+    try {
+      // Enregistrer l'agence et son profil administrateur associé
+      const result = mockSupabase.registerAgency({
+        name: newAgency.name,
+        logo_url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=200&q=80',
+        country: newAgency.country,
+        currency: newAgency.currency,
+        address: newAgency.address || 'Abidjan / Dakar',
+        phone: newAgency.phone,
+        email: newAgency.email,
+        plan: newAgency.plan,
+        status: newAgency.status
+      }, {
+        email: newAgency.email,
+        first_name: 'Admin',
+        last_name: newAgency.name,
+        phone: newAgency.phone,
+        password: defaultPassword
+      }, false);
+
+      const emailHtml = `
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; color: #1e293b; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="display: inline-block; width: 50px; height: 50px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; line-height: 50px; text-align: center; color: white; font-size: 24px; font-weight: bold;">I</div>
+            <h1 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 15px; margin-bottom: 5px; letter-spacing: -0.025em;">IMMO360 AFRIQUE</h1>
+            <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; margin: 0;">Création de votre Espace Agence</p>
+          </div>
+          <div style="line-height: 1.6; font-size: 15px;">
+            <p>Bonjour,</p>
+            <p>Un espace de gestion immobilière a été configuré pour votre agence <strong>"${result.agency.name}"</strong> sur la plateforme <strong>IMMO360 AFRIQUE</strong> par notre équipe.</p>
+            <p>Voici vos identifiants d'accès administrateur temporaires :</p>
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 20px 0;">
+              <p style="margin: 0 0 8px 0;"><strong>Identifiant (Email) :</strong> <span style="font-family: monospace; color: #d97706;">${result.profile.email}</span></p>
+              <p style="margin: 0;"><strong>Mot de passe temporaire :</strong> <span style="font-family: monospace; color: #d97706;">${defaultPassword}</span></p>
+            </div>
+            <p>Vous pouvez vous connecter dès à présent à votre tableau de bord pour enregistrer vos biens et vos locataires :</p>
+            <div style="text-align: center; margin: 25px 0;">
+              <a href="http://localhost:3000/dashboard" style="background-color: #f59e0b; color: #0f172a; padding: 12px 24px; border-radius: 8px; font-weight: bold; text-decoration: none; display: inline-block;">Accéder au Dashboard</a>
+            </div>
+            <p style="font-size: 13px; color: #64748b;">Par mesure de sécurité, nous vous recommandons vivement de modifier ce mot de passe par défaut lors de votre première connexion.</p>
+          </div>
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;" />
+          <div style="text-align: center; font-size: 12px; color: #94a3b8;">
+            <p style="margin: 0 0 4px 0;">© 2026 IMMO360 AFRIQUE. Tous droits réservés.</p>
+            <p style="margin: 0;">Côte d'Ivoire & Sénégal • Espace de Gestion Multi-tenant</p>
+          </div>
+        </div>
+      `;
+
+      const sent = await sendEmailNotification(result.agency.email, "Création de votre compte Agence - IMMO360 AFRIQUE", emailHtml);
+      if (sent) {
+        showToast(`Agence "${result.agency.name}" créée ! E-mail d'activation envoyé.`);
+      } else {
+        showToast(`Agence "${result.agency.name}" créée ! [Démo] Mail non envoyé. MDP : ${defaultPassword}`);
+      }
+    } catch (err) {
+      console.error("Failed to create agency:", err);
+      showToast("Une erreur est survenue lors de la création de l'agence.");
+    }
 
     setNewAgency({
       name: '',
@@ -1003,7 +1066,6 @@ export default function DashboardPage() {
     });
     
     reloadData();
-    showToast(`Agence "${added.name}" créée et enregistrée (Multi-tenant) !`);
   };
 
   const toggleAgencyStatus = (agencyId: string, currentStatus: Agency['status']) => {
@@ -1328,9 +1390,10 @@ export default function DashboardPage() {
                           </select>
                         </div>
                         <div>
-                          <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Téléphone Agence</label>
+                          <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Téléphone Agence *</label>
                           <input
                             type="text"
+                            required
                             value={signupPhone}
                             onChange={(e) => setSignupPhone(e.target.value)}
                             placeholder="Ex: +225 07..."
@@ -3861,6 +3924,7 @@ export default function DashboardPage() {
                   { id: 'plans', label: "Tarifs & Codes Promo" },
                   { id: 'commissions', label: "Commissions & Loyers (2%)" },
                   { id: 'broadcast', label: "Alertes & Diffusion Globale" },
+                  { id: 'contacts', label: "Mailing & Annuaire Agences" },
                   { id: 'infrastructure', label: "OHADA & Infrastructure" }
                 ].map((tab) => (
                   <button
@@ -4403,6 +4467,17 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div>
+                        <label className="text-[10px] text-slate-400 block mb-1 font-bold">Téléphone de l'agence *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newAgency.phone}
+                          onChange={(e) => setNewAgency({...newAgency, phone: e.target.value})}
+                          placeholder="Ex: +225 07 89 01 23 45"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-mono"
+                        />
+                      </div>
+                      <div>
                         <label className="text-[10px] text-slate-400 block mb-1 font-bold">Email professionnel *</label>
                         <input
                           type="email"
@@ -4413,6 +4488,7 @@ export default function DashboardPage() {
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:outline-none"
                         />
                       </div>
+
                       <button type="submit" className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl mt-2 transition-colors cursor-pointer">
                         Créer le Tenant Agence
                       </button>
@@ -4623,6 +4699,182 @@ export default function DashboardPage() {
                       {!broadcastActive && (
                         <span className="text-slate-400 italic block">Aucune alerte active actuellement.</span>
                       )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 6: CONTACTS & MAILING GROUPÉ */}
+              {saasTab === 'contacts' && (
+                <div className="space-y-6 text-left animate-fadeIn">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Send Group Email Form */}
+                    <div className="lg:col-span-2 p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
+                      <h3 className="font-title text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <Mail className="w-5 h-5 text-amber-500" />
+                        Envoyer un Message Groupé aux Agences
+                      </h3>
+                      
+                      <form onSubmit={async (e) => {
+                        e.preventDefault();
+                        const subject = (e.target as any).subject.value.trim();
+                        const message = (e.target as any).message.value.trim();
+                        if (!subject || !message) {
+                          showToast("Veuillez remplir le sujet et le message.");
+                          return;
+                        }
+                        
+                        setGroupEmailLoading(true);
+                        let successCount = 0;
+                        
+                        // Collect all agency emails
+                        const targetEmails = agencies.map(a => a.email.trim().toLowerCase());
+                        
+                        for (const email of targetEmails) {
+                          const html = `
+                            <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; color: #1e293b; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0;">
+                              <div style="text-align: center; margin-bottom: 30px;">
+                                <div style="display: inline-block; width: 50px; height: 50px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; line-height: 50px; text-align: center; color: white; font-size: 24px; font-weight: bold;">I</div>
+                                <h1 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 15px; margin-bottom: 5px; letter-spacing: -0.025em;">IMMO360 AFRIQUE</h1>
+                                <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; margin: 0;">Communication Super Admin Platforme</p>
+                              </div>
+                              <div style="line-height: 1.6; font-size: 14px;">
+                                ${message.replace(/\n/g, '<br/>')}
+                              </div>
+                              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
+                              <p style="font-size: 10px; color: #94a3b8; text-align: center; margin: 0;">Ce message vous a été envoyé par l'administrateur de la plateforme IMMO360 AFRIQUE.</p>
+                            </div>
+                          `;
+                          const ok = await sendEmailNotification(email, subject, html);
+                          if (ok) successCount++;
+                        }
+                        
+                        setGroupEmailLoading(false);
+                        showToast(`Message envoyé avec succès à ${successCount} agences !`);
+                        (e.target as any).reset();
+                      }} className="space-y-4 text-xs">
+                        <div>
+                          <label className="text-[10px] text-slate-400 block mb-1 font-bold">Sujet du Message *</label>
+                          <input
+                            type="text"
+                            name="subject"
+                            required
+                            placeholder="Ex: Mise à jour majeure de la plateforme ou Maintenance"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-400 block mb-1 font-bold">Corps du Message (HTML supporté) *</label>
+                          <textarea
+                            name="message"
+                            required
+                            rows={8}
+                            placeholder="Saisissez votre message ici..."
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 focus:outline-none"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={groupEmailLoading}
+                          className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-700 text-white font-bold rounded-xl mt-2 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                        >
+                          {groupEmailLoading ? (
+                            <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                          ) : (
+                            <span>Diffuser le Message aux Agences</span>
+                          )}
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Quick Copies & Stats */}
+                    <div className="space-y-6">
+                      <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
+                        <h3 className="font-title text-base font-bold text-slate-900 mb-4">Actions de Copie</h3>
+                        <div className="space-y-3">
+                          <button
+                            onClick={() => {
+                              const allEmails = agencies.map(a => a.email).join(', ');
+                              navigator.clipboard.writeText(allEmails);
+                              showToast("Tous les e-mails ont été copiés dans le presse-papier !");
+                            }}
+                            className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-slate-200"
+                          >
+                            Copier tous les e-mails
+                          </button>
+                          <button
+                            onClick={() => {
+                              const allPhones = agencies.map(a => a.phone || '+225 00 00 00 00').join(', ');
+                              navigator.clipboard.writeText(allPhones);
+                              showToast("Tous les numéros de téléphone ont été copiés !");
+                            }}
+                            className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-slate-200"
+                          >
+                            Copier tous les téléphones
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm text-xs space-y-3">
+                        <h3 className="font-title text-base font-bold text-slate-900">Statistiques</h3>
+                        <div className="flex justify-between border-b border-slate-100 pb-2">
+                          <span className="text-slate-400">Total Agences :</span>
+                          <span className="font-bold text-slate-800 font-mono">{agencies.length}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-slate-100 pb-2">
+                          <span className="text-slate-400">Mails valides :</span>
+                          <span className="font-bold text-slate-800 font-mono">{agencies.filter(a => a.email).length}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Téléphones renseignés :</span>
+                          <span className="font-bold text-slate-800 font-mono">{agencies.filter(a => a.phone).length}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contacts Table */}
+                  <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm text-xs">
+                    <h3 className="font-title text-base font-bold text-slate-900 mb-4">Annuaire des Contacts Agences</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-slate-400 uppercase font-bold text-[10px]">
+                            <th className="py-3 px-4">Agence</th>
+                            <th className="py-3 px-4">Pays</th>
+                            <th className="py-3 px-4">Adresse Email</th>
+                            <th className="py-3 px-4">Téléphone</th>
+                            <th className="py-3 px-4">Plan</th>
+                            <th className="py-3 px-4">Statut</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {agencies.map((agency) => (
+                            <tr key={agency.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                              <td className="py-3 px-4 font-bold text-slate-800">{agency.name}</td>
+                              <td className="py-3 px-4 text-slate-500 font-medium">{agency.country}</td>
+                              <td className="py-3 px-4 font-mono text-slate-600">{agency.email}</td>
+                              <td className="py-3 px-4 font-mono text-slate-600">{agency.phone || "Non renseigné"}</td>
+                              <td className="py-3 px-4">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                  agency.plan === 'VIP' ? 'bg-purple-100 text-purple-700' :
+                                  agency.plan === 'Premium' ? 'bg-amber-100 text-amber-700' :
+                                  'bg-slate-100 text-slate-700'
+                                }`}>
+                                  {agency.plan}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                  agency.status === 'Suspendu' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                                }`}>
+                                  {agency.status || 'Actif'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 </div>
