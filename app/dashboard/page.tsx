@@ -82,6 +82,8 @@ export default function DashboardPage() {
   // States pour les onglets de la console SaaS
   const [saasTab, setSaasTab] = useState<'overview' | 'agencies' | 'plans' | 'commissions' | 'broadcast' | 'contacts' | 'infrastructure'>('overview');
   const [groupEmailLoading, setGroupEmailLoading] = useState(false);
+  const [emailPreviewUrl, setEmailPreviewUrl] = useState<string | null>(null);
+  const [isEmailTestMode, setIsEmailTestMode] = useState<boolean>(false);
 
   // States pour les annonces globales (broadcast)
   const [broadcastMessage, setBroadcastMessage] = useState<string>('Maintenance planifiée ce soir de 23h à 01h GMT pour optimisation des bases de données locales.');
@@ -425,13 +427,26 @@ export default function DashboardPage() {
       });
       const data = await response.json();
       if (data.success) {
+        if (data.isTest) {
+          setIsEmailTestMode(true);
+          if (data.previewUrl) {
+            setEmailPreviewUrl(data.previewUrl);
+          } else {
+            setEmailPreviewUrl(null);
+          }
+        } else {
+          setIsEmailTestMode(false);
+          setEmailPreviewUrl(null);
+        }
         return true;
       } else {
         console.warn(`Email sending failed: ${data.error}`);
+        setIsEmailTestMode(true);
         return false;
       }
     } catch (error) {
       console.error('Failed to send email:', error);
+      setIsEmailTestMode(true);
       return false;
     }
   };
@@ -1536,6 +1551,13 @@ export default function DashboardPage() {
                         </div>
                       )}
 
+                      {isEmailTestMode && (
+                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs">
+                          <span className="font-bold block mb-1">🔑 Mode Démo Actif</span>
+                          Puisqu'aucun serveur SMTP n'est configuré, utilisez le code de validation suivant : <strong className="text-white font-mono text-sm tracking-wider select-all">{generatedCode}</strong>
+                        </div>
+                      )}
+
                       <div>
                         <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Code de Validation (6 chiffres)</label>
                         <input
@@ -1837,6 +1859,13 @@ export default function DashboardPage() {
 
                 {forgotStep === 2 && (
                   <form onSubmit={handleForgotVerify} className="space-y-4 text-left">
+                    {isEmailTestMode && (
+                      <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs">
+                        <span className="font-bold block mb-1">🔑 Mode Démo Actif</span>
+                        Puisqu'aucun serveur SMTP n'est configuré, utilisez le code de validation suivant : <strong className="text-white font-mono text-sm tracking-wider select-all">{forgotGeneratedCode}</strong>
+                      </div>
+                    )}
+
                     <div>
                       <label className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">Code de Validation à 6 chiffres</label>
                       <input
@@ -6600,6 +6629,32 @@ export default function DashboardPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* FLOAT TOAST FOR ETHEREAL TEST EMAIL PREVIEW */}
+      {emailPreviewUrl && (
+        <div className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 px-5 py-4 rounded-2xl shadow-2xl border border-amber-400 flex items-center justify-between gap-4 max-w-sm">
+          <div className="text-left">
+            <span className="font-bold text-xs block">📧 E-mail de validation (Test)</span>
+            <span className="text-[10px] opacity-90 block mt-0.5">Le mail a été généré via le simulateur Ethereal.</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href={emailPreviewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 bg-slate-950 text-white rounded-lg font-bold text-[10px] hover:bg-slate-900 transition-colors inline-block"
+            >
+              Ouvrir l'E-mail
+            </a>
+            <button
+              onClick={() => setEmailPreviewUrl(null)}
+              className="p-1 hover:bg-amber-400/20 text-slate-950 rounded-lg cursor-pointer bg-transparent border-none flex items-center justify-center"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );
